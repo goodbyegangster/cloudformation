@@ -120,7 +120,7 @@ Resources:
           # DnsServers:
           #   - String
           # DockerLabels:
-          #   文字列: String
+          #   String: String
           # DockerSecurityOptions:
           #   - String
           # EntryPoint:
@@ -140,7 +140,7 @@ Resources:
           # Hostname: String
           Image: "datadog/agent:latest"
           # Links:
-          #   - 文字列
+          #   - String
           # LinuxParameters:
           #   LinuxParameters
           LogConfiguration:
