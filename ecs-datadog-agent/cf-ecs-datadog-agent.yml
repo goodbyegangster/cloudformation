@@ -1,0 +1,226 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CFn for ECS Datadog Agent Conteiner"
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: "CFn for ECS Datadog Agent Conteiner"
+        Parameters:
+          - DataDogApiKey
+          - EcsCluster
+Parameters:
+  DataDogApiKey:
+    Type: "String"
+  EcsCluster:
+    Type: "String"
+Resources:
+  IamExecutionRole:
+    # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html
+    Type: "AWS::IAM::Role"
+    DeletionPolicy: "Delete"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "ecs-tasks.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+        - "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+      # MaxSessionDuration: Integer
+      # Path: String
+      # PermissionsBoundary: String
+      # Policies:
+      #   - Policies
+      RoleName: datadog-agent-ecs-execution-role
+  IamTaskRole:
+    # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html
+    Type: "AWS::IAM::Role"
+    DeletionPolicy: "Delete"
+    DependsOn: "IamExecutionRole"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "ecs-tasks.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+      # MaxSessionDuration: Integer
+      # Path: String
+      # PermissionsBoundary: String
+      Policies:
+        - PolicyName: "datadog-agent-container-policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action: "ecs:ListClusters"
+                Resource: "*"
+              - Effect: "Allow"
+                Action: "ecs:ListContainerInstances"
+                Resource: "*"
+              - Effect: "Allow"
+                Action: "ecs:DescribeContainerInstances"
+                Resource: "*"
+      RoleName: datadog-agent-ecs-task-role
+  TaskDefinition:
+    # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-taskdefinition.html
+    Type: "AWS::ECS::TaskDefinition"
+    DependsOn : "IamTaskRole"
+    Properties:
+      Volumes:
+        - Host:
+            SourcePath: "/var/run/docker.sock"
+          Name: "docker_sock"
+          # DockerVolumeConfiguration:
+          #   DockerVolumeConfiguration
+        - Host:
+            SourcePath: "/proc/"
+          Name: "proc"
+          # DockerVolumeConfiguration:
+          #   DockerVolumeConfiguration
+        - Host:
+            SourcePath: "/sys/fs/cgroup/"
+          Name: "cgroup"
+          # DockerVolumeConfiguration:
+          #   DockerVolumeConfiguration
+        - Host:
+            SourcePath: "/etc/passwd"
+          Name: "passwd"
+          # DockerVolumeConfiguration:
+          #   DockerVolumeConfiguration
+      # Cpu: String
+      ExecutionRoleArn: !GetAtt IamExecutionRole.Arn
+      Family: "datadog-agent-task"
+      # Memory: String
+      NetworkMode: bridge
+      # PlacementConstraints:
+      #   - TaskDefinitionPlacementConstraint
+      RequiresCompatibilities:
+        - "EC2"
+      TaskRoleArn: !GetAtt IamTaskRole.Arn
+      ContainerDefinitions:
+        -
+          # Command:
+          #   - String
+          Cpu: "10"
+          # DisableNetworking: Boolean
+          # DnsSearchDomains:
+          #   - String
+          # DnsServers:
+          #   - String
+          # DockerLabels:
+          #   文字列: String
+          # DockerSecurityOptions:
+          #   - String
+          # EntryPoint:
+          #   - String
+          Environment:
+            - Name: "DD_API_KEY"
+              Value: !Ref "DataDogApiKey"
+            - Name: "DD_SITE"
+              Value: "datadoghq.com"
+            - Name: "DD_PROCESS_AGENT_ENABLED"
+              Value: "true"
+          Essential: "true"
+          # ExtraHosts:
+          #   - HostEntry
+          # HealthCheck:
+          #   HealthCheck
+          # Hostname: String
+          Image: "datadog/agent:latest"
+          # Links:
+          #   - 文字列
+          # LinuxParameters:
+          #   LinuxParameters
+          LogConfiguration:
+            LogDriver: "awslogs"
+            Options:
+              awslogs-create-group: true
+              awslogs-group: "/ecs/datadog-agent"
+              awslogs-region: !Ref "AWS::Region"
+              awslogs-stream-prefix: "datadog-agent"
+          Memory: "256"
+          # MemoryReservation: Integer
+          MountPoints:
+            - ContainerPath: "/var/run/docker.sock"
+              SourceVolume: "docker_sock"
+              ReadOnly: "true"
+            - ContainerPath: "/host/sys/fs/cgroup"
+              SourceVolume: "cgroup"
+              ReadOnly: "true"
+            - ContainerPath: "/host/proc"
+              SourceVolume: "proc"
+              ReadOnly: "true"
+            - ContainerPath: "/etc/passwd"
+              SourceVolume: "passwd"
+              ReadOnly: "true"
+          Name: "datadog-agent"
+          # PortMappings:
+          #   - PortMapping
+          # Privileged: Boolean
+          # ReadonlyRootFilesystem: Boolean
+          # RepositoryCredentials:
+          #   RepositoryCredentials
+          # Ulimits:
+          #   - Ulimit
+          # User: String
+          # VolumesFrom:
+          #   - VolumeFrom
+          # WorkingDirectory: String
+  Service:
+    # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-service.html
+    Type: "AWS::ECS::Service"
+    DeletionPolicy: "Delete"
+    DependsOn : "TaskDefinition"
+    Properties:
+      Cluster: !Ref EcsCluster
+      DeploymentConfiguration:
+        MaximumPercent: "100"
+        MinimumHealthyPercent: "0"
+      # DesiredCount: Integer
+      # HealthCheckGracePeriodSeconds: Integer
+      LaunchType: "EC2"
+      # LoadBalancers:
+      #   - Load Balancer Objects
+      # PlacementConstraints:
+      #   - PlacementConstraints
+      # PlacementStrategies:
+      #   - PlacementStrategies
+      # Role: String
+      SchedulingStrategy: "DAEMON"
+      ServiceName: "datadog-agent"
+      # ServiceRegistries:
+      #   - ServiceRegistry
+      TaskDefinition: !Ref "TaskDefinition"
+Outputs:
+  ExecutionRoleArn:
+    Description: "ARN of IamExecutionRole"
+    Value: !GetAtt IamExecutionRole.Arn
+    Export:
+      Name: "datadog-agent-ecs-execution-iam-role"
+  TaskRoleArn:
+    Description: "ARN of IamTaskRole"
+    Value: !GetAtt IamTaskRole.Arn
+    Export:
+      Name: "datadog-agent-ecs-task-iam-role"
+  TaskDefinitionArn:
+    Description: "ARN of TaskDefinition"
+    Value: !Ref TaskDefinition
+    Export:
+      Name: "datadog-agent-ecs-task"
+  ServiceArn:
+    Description: "ARN of Service"
+    Value: !Ref Service
+    Export:
+      Name: "datadog-agent-ecs-service"
