@@ -103,7 +103,7 @@ Resources:
       ExecutionRoleArn: !GetAtt IamExecutionRole.Arn
       Family: "datadog-agent-ecs-task"
       # Memory: String
-      NetworkMode: bridge
+      NetworkMode: "bridge"
       # PlacementConstraints:
       #   - TaskDefinitionPlacementConstraint
       RequiresCompatibilities:
