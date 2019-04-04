@@ -101,7 +101,7 @@ Resources:
           #   DockerVolumeConfiguration
       # Cpu: String
       ExecutionRoleArn: !GetAtt IamExecutionRole.Arn
-      Family: "datadog-agent-task"
+      Family: "datadog-agent-ecs-task"
       # Memory: String
       NetworkMode: bridge
       # PlacementConstraints:
