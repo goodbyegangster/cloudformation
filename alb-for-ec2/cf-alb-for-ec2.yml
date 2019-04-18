@@ -1,0 +1,213 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CFn for ALB for EC2"
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: "CFn for ALB for EC2"
+        Parameters:
+          - VpcId
+          - Subnet
+          - LoadBalancerName
+Parameters:
+  VpcId:
+    Type: "AWS::EC2::VPC::Id"
+  Subnet:
+    Type: "List<AWS::EC2::Subnet::Id>"
+  LoadBalancerName:
+    Type: "String"
+  EC2Instance:
+    Type: "AWS::EC2::Instance::Id"
+Resources:
+  SecurityGroup:
+  # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group-rule.html
+    Type: "AWS::EC2::SecurityGroup"
+    DeletionPolicy: "Delete"
+    Properties:
+      GroupName: !Sub for-alb-${LoadBalancerName}
+      GroupDescription: !Sub for-alb-${LoadBalancerName}
+      # SecurityGroupEgress:
+      #   - Security Group Rule
+      SecurityGroupIngress:
+        - 
+          CidrIp: "0.0.0.0/0"
+          # CidrIpv6: String
+          # Description: String
+          IpProtocol: "tcp"
+          FromPort: "80"
+          ToPort: "80"
+          # SourceSecurityGroupId: String
+          # SourceSecurityGroupName: String
+          # SourceSecurityGroupOwnerId: String
+      Tags:
+        - Key: "Name"
+          Value: !Sub for-alb-${LoadBalancerName}
+      VpcId: !Ref "VpcId"
+  S3Bucket:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-properties-s3-bucket.html
+    Type: "AWS::S3::Bucket"
+    DeletionPolicy: "Delete"
+    DependsOn: "SecurityGroup"
+    Properties:
+      # AccessControl: String
+      # AccelerateConfiguration:
+      #   AccelerateConfiguration
+      # AnalyticsConfigurations:
+      #   - AnalyticsConfiguration
+      # BucketEncryption: 
+      #   BucketEncryption
+      BucketName: !Sub aws-logs-elb-${LoadBalancerName}
+      # CorsConfiguration:
+      #   CorsConfiguration
+      # InventoryConfigurations:
+      #   - InventoryConfiguration 
+      LifecycleConfiguration:
+        Rules:
+          -
+            # AbortIncompleteMultipartUpload: 
+            #   AbortIncompleteMultipartUpload
+            # ExpirationDate: String
+            ExpirationInDays: "30"
+            Id: !Sub s3-lifecycle-rule-${LoadBalancerName}
+            NoncurrentVersionExpirationInDays: "30"
+            # NoncurrentVersionTransitions:
+            #   - NoncurrentVersionTransition
+            # Prefix: String
+            Status: "Enabled"
+            # TagFilters: 
+            #   - TagFilter
+            # Transitions:
+            #   - Transition
+      # LoggingConfiguration:
+      #   LoggingConfiguration
+      # MetricsConfigurations: 
+      #   - MetricsConfiguration
+      # NotificationConfiguration:
+      #   NotificationConfiguration
+      # PublicAccessBlockConfiguration: 
+      #   PublicAccessBlockConfiguration
+      # ReplicationConfiguration:
+      #   ReplicationConfiguration
+      Tags:
+        - Key: "env"
+          Value: "develop"
+      # VersioningConfiguration:
+      #   VersioningConfiguration
+      # WebsiteConfiguration:
+      #   WebsiteConfiguration
+  S3BucketPolicy:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-properties-s3-bucket.html
+    Type: "AWS::S3::BucketPolicy"
+    DeletionPolicy: "Delete"
+    DependsOn: "S3Bucket"
+    Properties:
+      Bucket: !Ref S3Bucket
+      PolicyDocument:
+        Statement: 
+          - 
+            Action: 
+              - "s3:PutObject"
+            Effect: "Allow"
+            Resource: !Sub arn:aws:s3:::${S3Bucket}/${LoadBalancerName}/AWSLogs/${AWS::AccountId}/*
+            Principal:
+              AWS: "582318560864"
+  LoadBalancer:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-elasticloadbalancingv2-loadbalancer.html
+    Type: "AWS::ElasticLoadBalancingV2::LoadBalancer"
+    DependsOn: "S3BucketPolicy"
+    DeletionPolicy: "Delete"
+    Properties:
+      IpAddressType: "ipv4"
+      LoadBalancerAttributes:
+        - Key: "access_logs.s3.enabled"
+          Value: "true"
+        - Key: "access_logs.s3.bucket"
+          Value: !Ref "S3Bucket"
+        - Key: "access_logs.s3.prefix"
+          Value: !Ref "LoadBalancerName"
+        - Key: "deletion_protection.enabled"
+          Value: "false"
+        - Key: "idle_timeout.timeout_seconds"
+          Value: "60"
+        - Key: "routing.http2.enabled"
+          Value: "true"
+      Name: !Ref "LoadBalancerName"
+      Scheme: "internet-facing"
+      SecurityGroups:
+        - !Ref "SecurityGroup"
+      # SubnetMappings:
+      #   - SubnetMapping
+      Subnets: !Ref "Subnet"
+      Tags:
+        - Key: "env"
+          Value: "develop"
+      Type: "application"
+  TargetGroup:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-elasticloadbalancingv2-targetgroup.html
+    Type: "AWS::ElasticLoadBalancingV2::TargetGroup"
+    DependsOn: "LoadBalancer"
+    DeletionPolicy: "Delete"
+    Properties:
+      HealthCheckIntervalSeconds: "30"
+      HealthCheckPath: "/"
+      HealthCheckPort: "traffic-port"
+      HealthCheckProtocol: "HTTP"
+      HealthCheckTimeoutSeconds: "5"
+      HealthyThresholdCount: "5"
+      Matcher:
+        HttpCode: "200"
+      Name: !Sub tg-${LoadBalancerName}
+      Port: "80"
+      Protocol: "HTTP"
+      Tags:
+        - Key: "env"
+          Value: "develop"
+      TargetGroupAttributes:
+        - Key: "deregistration_delay.timeout_seconds"
+          Value: "300"
+      Targets:
+        - 
+          # AvailabilityZone: String
+          Id: !Ref EC2Instance
+          # Port: Integer
+      TargetType: "instance"
+      UnhealthyThresholdCount: "2"
+      VpcId: !Ref "VpcId"
+  Listener:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-elasticloadbalancingv2-listener.html
+    Type: "AWS::ElasticLoadBalancingV2::Listener"
+    DependsOn: "TargetGroup"
+    DeletionPolicy: "Delete"
+    Properties:
+      # Certificates:
+      #   - CertificateArn: String
+      DefaultActions:
+        -
+          # AuthenticateCognitoConfig: AuthenticateCognitoConfig
+          # AuthenticateOidcConfig: AuthenticateOidcConfig
+          # FixedResponseConfig: FixedResponseConfig
+          Order: "1"
+          # RedirectConfig: RedirectConfig
+          TargetGroupArn: !Ref TargetGroup
+          Type: "forward"
+      LoadBalancerArn: !Ref "LoadBalancer"
+      Port: "80"
+      Protocol: "HTTP"
+      # SslPolicy: String
+Outputs:
+  SecurityGroupId:
+    Description: "ID of SecurityGroup"
+    Value: !GetAtt SecurityGroup.GroupId
+    Export:
+      Name: "SecurityGroupId"
+  S3BucketArn:
+    Description: "ARN of S3Bucket"
+    Value: !GetAtt S3Bucket.Arn
+    Export:
+      Name: "S3BucketArn"
+  LoadBalancerArn:
+    Description: "ARN of LoadBalancer"
+    Value: !Ref LoadBalancer
+    Export:
+      Name: "LoadBalancerArn"
