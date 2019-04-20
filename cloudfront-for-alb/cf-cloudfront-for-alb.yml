@@ -1,0 +1,151 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CFn for CloudFront for alb"
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: CFn for CloudFront for alb
+        Parameters:
+          - CloudFrontName
+          - ELBDNSName
+Parameters:
+  CloudFrontName:
+    Type: "String"
+  ELBDNSName:
+    Type: "String"
+Resources:
+  CloudFrontDistribution:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-cloudfront-distribution.html
+    Type: "AWS::CloudFront::Distribution"
+    DeletionPolicy: "Delete"
+    Properties:
+      DistributionConfig:
+        # Aliases:
+        #   - String
+        # CacheBehaviors:
+        #   -
+        #     AllowedMethods:
+        #       - "DELETE"
+        #       - "GET"
+        #       - "HEAD"
+        #       - "OPTIONS"
+        #       - "PATCH"
+        #       - "POST"
+        #       - "PUT"
+        #     CachedMethods:
+        #       - "GET"
+        #       - "HEAD"
+        #       - "OPTIONS"
+        #     Compress: Boolean
+        #     DefaultTTL: "86400"
+        #     FieldLevelEncryptionId : String,
+        #     ForwardedValues:
+        #       Cookies:
+        #         Cookies
+        #       Headers:
+        #         - String
+        #       QueryString: Boolean
+        #       QueryStringCacheKeys:
+        #         - String
+        #     LambdaFunctionAssociations:
+        #       - LambdaFunctionAssociation
+        #     MaxTTL: Number
+        #     MinTTL: Number
+        #     PathPattern: String
+        #     SmoothStreaming: Boolean
+        #     TargetOriginId: String
+        #     TrustedSigners:
+        #       - String
+        #     ViewerProtocolPolicy: String
+        Comment: !Ref CloudFrontName
+        # CustomErrorResponses:
+        #   -
+        #     ErrorCachingMinTTL: Integer
+        #     ErrorCode: Integer
+        #     ResponseCode: Integer
+        #     ResponsePagePath: String
+        DefaultCacheBehavior:
+          AllowedMethods:
+            - "DELETE"
+            - "GET"
+            - "HEAD"
+            - "OPTIONS"
+            - "PATCH"
+            - "POST"
+            - "PUT"
+          # CachedMethods:
+          #   - "GET"
+          #   - "HEAD"
+          #   - "OPTIONS"
+          Compress: "false"
+          DefaultTTL: "0"
+          # FieldLevelEncryptionId: String,
+          ForwardedValues:
+            Cookies:
+              Forward: "all"
+            Headers:
+              - Host
+              - Referer
+            QueryString: "true"
+            # QueryStringCacheKeys:
+            #   - String
+          # LambdaFunctionAssociations:
+          #   - LambdaFunctionAssociation
+          MaxTTL: "0"
+          MinTTL: "0"
+          # SmoothStreaming: Boolean
+          TargetOriginId: !Sub id-${ELBDNSName}
+          # TrustedSigners:
+          #   - String
+          ViewerProtocolPolicy : "allow-all"
+        # DefaultRootObject: String
+        Enabled: "true"
+        HttpVersion: "http2"
+        IPV6Enabled: "true"
+        # Logging:
+        #   Bucket: String
+        #   IncludeCookies: "false"
+        #   Prefix: String
+        Origins:
+          -
+            CustomOriginConfig:
+              HTTPPort: "80"
+              # HTTPSPort: Integer
+              OriginKeepaliveTimeout: "5"
+              OriginProtocolPolicy: "match-viewer"
+              OriginReadTimeout: "30"
+              # OriginSSLProtocols:
+              #   - TLSv1.1
+              #   - TLSv1.2
+            DomainName: !Ref ELBDNSName
+            Id: !Sub id-${ELBDNSName}
+            # OriginCustomHeaders:
+            #   -
+            #     HeaderName: String
+            #     HeaderValue: String
+            # OriginPath: String
+            # S3OriginConfig:
+            #   OriginAccessIdentity: String
+        PriceClass: "PriceClass_All"
+        # Restrictions:
+        #   GeoRestriction:
+        #     Locations:
+        #       - String
+        #     RestrictionType: String
+        # ViewerCertificate:
+        #   AcmCertificateArn: String
+        #   CloudFrontDefaultCertificate: Boolean
+        #   IamCertificateId: String
+        #   MinimumProtocolVersion: "TLSv1.1_2016"
+        #   SslSupportMethod: "sni-only"
+        # WebACLId: String
+      Tags:
+        - Key: "env"
+          Value: "develop"
+Outputs:
+  CloudFrontDistributionId:
+    Description: "ID of CloudFront Distribution"
+    Value: !Ref CloudFrontDistribution
+    Export:
+      Name: "CloudFrontDistributionId"
