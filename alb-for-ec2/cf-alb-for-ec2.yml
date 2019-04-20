@@ -10,6 +10,7 @@ Metadata:
           - VpcId
           - Subnet
           - LoadBalancerName
+          - EC2Instance
 Parameters:
   VpcId:
     Type: "AWS::EC2::VPC::Id"
