@@ -1,0 +1,172 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CFn for ECS Container-Instance"
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: "CFn for ECS Container-Instance"
+        Parameters:
+          - ClusterName
+          - Ami
+          - InstanceType
+          - KeyName
+          - SecurityGroups
+          - Subnets
+          - SSMParam
+          - Environment
+Parameters:
+  ClusterName:
+    Type: "String"
+    Description: "Do not use underbar"
+  Ami:
+    Type: "String"
+  InstanceType:
+    Type: "String"
+    Default: "t3.small"
+  KeyName:
+    Type: "AWS::EC2::KeyPair::KeyName"
+  SecurityGroups:
+    Type: "AWS::EC2::SecurityGroup::Id"
+  Subnets:
+    Type: "List<AWS::EC2::Subnet::Id>"
+  SSMParam:
+    Type: "AWS::SSM::Parameter::Name"
+    Description: "Type SSM Paramater Store Name for Cloudwatch Agent"
+  Environment:
+    Type: "String"
+    AllowedValues:
+      - PRS
+      - ISS
+      - DEV
+
+Resources:
+  IAMRole:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html
+    Type: "AWS::IAM::Role"
+    DeletionPolicy: "Delete"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "ec2.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role
+      Policies:
+        - PolicyName: !Sub ${ClusterName}-ssm-getparm
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action: "ssm:GetParameter"
+                Resource: "*"
+      RoleName: !Sub ${ClusterName}-instance-role
+  InstanceProfile:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-iam-instanceprofile.html
+    Type: "AWS::IAM::InstanceProfile"
+    DeletionPolicy: "Delete"
+    DependsOn: "IAMRole"
+    Properties:
+      Roles:
+        - !Sub ${ClusterName}-instance-role
+  LaunchConfiguration:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-properties-as-launchconfig.html
+    Type: "AWS::AutoScaling::LaunchConfiguration"
+    DeletionPolicy: "Delete"
+    DependsOn: "InstanceProfile"
+    Properties:
+      AssociatePublicIpAddress: true
+      BlockDeviceMappings:
+        - DeviceName: "/dev/xvda"
+          Ebs:
+            DeleteOnTermination: true
+            VolumeSize: "30"
+            VolumeType: "gp2"
+      EbsOptimized: true
+      IamInstanceProfile: !Ref "InstanceProfile"
+      ImageId: !Ref "Ami"
+      InstanceMonitoring: true
+      InstanceType: !Ref "InstanceType"
+      KeyName: !Ref "KeyName"
+      LaunchConfigurationName: !Sub ${ClusterName}-LaunchConf
+      SecurityGroups:
+        - Ref: "SecurityGroups"
+      UserData:
+        Fn::Base64:
+          !Sub |
+            #!/bin/bash
+
+            ## Setting ecs-config
+            echo ECS_CLUSTER=${ClusterName} >> /etc/ecs/ecs.config
+
+            # install module
+            yum install -y awscli wget
+
+            # Setting SystemClock
+            cat > /etc/sysconfig/clock << __EOF__
+            ZONE="Asia/Tokyo"
+            UTC=false
+            __EOF__
+
+            # Setting TimeZone
+            /bin/cp -fp /usr/share/zoneinfo/Asia/Tokyo /etc/localtime
+
+            # Cloudwatch Agent Install
+            wget https://s3.amazonaws.com/amazoncloudwatch-agent/amazon_linux/amd64/latest/amazon-cloudwatch-agent.rpm
+            sudo rpm -U ./amazon-cloudwatch-agent.rpm
+            sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c ssm:${SSMParam} -s
+            sudo systemctl restart amazon-cloudwatch-agent.service
+
+            # SSM Agent Install
+            yum localinstall -y https://amazon-ssm-${AWS::Region}.s3.amazonaws.com/latest/linux_amd64/amazon-ssm-agent.rpm
+            systemctl is-enabled amazon-ssm-agent
+            systemctl restart amazon-ssm-agent
+  AutoScaleGroup:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-properties-as-group.html
+    Type: "AWS::AutoScaling::AutoScalingGroup"
+    DeletionPolicy: "Delete"
+    DependsOn: "LaunchConfiguration"
+    Properties:
+      AutoScalingGroupName: !Sub as-${ClusterName}
+      DesiredCapacity: "2"
+      HealthCheckType: "EC2"
+      HealthCheckGracePeriod: "300"
+      LaunchConfigurationName: !Ref "LaunchConfiguration"
+      MaxSize: "2"
+      MetricsCollection:
+        - Granularity: "1Minute"
+      MinSize: "2"
+      Tags:
+        - Key: "Name"
+          Value: !Sub ${ClusterName}-container-instance
+          PropagateAtLaunch: true
+        - Key: "Environment"
+          Value: !Sub Environment
+          PropagateAtLaunch: true
+      TerminationPolicies:
+        - "Default"
+      VPCZoneIdentifier: !Ref "Subnets"
+  ECSCluster:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ecs-cluster.html
+    Type: "AWS::ECS::Cluster"
+    DeletionPolicy: "Delete"
+    Properties:
+      ClusterName: !Ref "ClusterName"
+Outputs:
+  LaunchConfigurationID:
+    Description: "ID of LaunchConfiguration"
+    Value: !Ref LaunchConfiguration
+    Export:
+      Name: "LaunchConfigurationID"
+  AutoScaleGroupID:
+    Description: "ID of AutoScaleGroup"
+    Value: !Ref AutoScaleGroup
+    Export:
+      Name: "AutoScaleGroupID"
