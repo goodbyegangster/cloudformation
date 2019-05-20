@@ -1,0 +1,69 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CFn for IAM User for Ansible EC2 Dyanmic Inventory"
+Resources:
+  IamGroup:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-properties-iam-group.html
+    Type: "AWS::IAM::Group"
+    DeletionPolicy: "Delete"
+    Properties:
+      GroupName: "group-ansible-ec2-dynamic-inventory"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
+      # Path: String
+      # Policies:
+      #   - PolicyName: String
+      #     PolicyDocument: JSON
+  IamUser:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-properties-iam-user.html
+    Type: "AWS::IAM::User"
+    DeletionPolicy: "Delete"
+    DependsOn: "IamGroup"
+    Properties:
+      Groups:
+        - !Ref "IamGroup"
+      # LoginProfile:
+      #   Password: String
+      #   PasswordResetRequired: Boolean
+      # ManagedPolicyArns:
+      #   - String
+      # Path: String
+      PermissionsBoundary: "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
+      # Policies:
+      #   - PolicyName: String
+      #     PolicyDocument: JSON
+      UserName: "user-ansible-ec2-dynamic-inventory"
+  AccessKey:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-properties-iam-accesskey.html
+    Type: "AWS::IAM::AccessKey"
+    DeletionPolicy: "Delete"
+    DependsOn: "IamUser"
+    Properties: 
+      # Serial: Integer
+      Status: "Active"
+      UserName: !Ref "IamUser"
+Outputs:
+  IamGroupArn:
+    Description: "ARN of IAM Group"
+    Value: !GetAtt IamGroup.Arn
+    Export:
+      Name: "IamGroupArn"
+  IamUserArn:
+    Description: "ARN of IAM User"
+    Value: !GetAtt IamUser.Arn
+    Export:
+      Name: "IamUserArn"
+  IamUserName:
+    Description: "Name of IAM User"
+    Value: !Ref IamUser
+    Export:
+      Name: "IamUserName"
+  AccessKeyName:
+    Description: "AccessKeyName"
+    Value: !Ref AccessKey
+    Export:
+      Name: "AccessKeyName"  
+  SecretAccessKey:
+    Description: "SecretAccessKey"
+    Value: !GetAtt AccessKey.SecretAccessKey
+    Export:
+      Name: "SecretAccessKey"
