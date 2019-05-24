@@ -1,0 +1,57 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CFn for NatGateway"
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: "CFn for NatGateway"
+        Parameters:
+          - PublicSubnet
+          - RouteTable
+Parameters:
+  PublicSubnet:
+    Type: "AWS::EC2::Subnet::Id"
+  RouteTable:
+    Type: "String"
+    AllowedPattern: ^rtb-\w+$
+Resources:
+  EIP:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-eip.html
+    Type: "AWS::EC2::EIP"
+    DeletionPolicy: "Delete"
+    Properties:
+      Domain: "vpc"
+      # InstanceId: String
+      # PublicIpv4Pool: String
+  NatGateway:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-natgateway.html
+    Type: "AWS::EC2::NatGateway"
+    DependsOn: "EIP"
+    DeletionPolicy: "Delete"
+    Properties:
+      AllocationId: !GetAtt EIP.AllocationId
+      SubnetId: !Ref PublicSubnet
+      # Tags:
+      #   - Resource Tag
+  NatRoute:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-route.html
+    Type: "AWS::EC2::Route"
+    DependsOn: "NatGateway"
+    DeletionPolicy: "Delete"
+    Properties:
+      DestinationCidrBlock: "0.0.0.0/0"
+      # DestinationIpv6CidrBlock: String
+      # EgressOnlyInternetGatewayId: String
+      # GatewayId: String
+      # InstanceId: String
+      NatGatewayId: !Ref "NatGateway"
+      # NetworkInterfaceId: String
+      RouteTableId: !Ref "RouteTable"
+      # VpcPeeringConnectionId: String
+Outputs:
+  NatGatewayIP:
+    Description: "IP of NatGateway"
+    Value: !Ref "EIP"
+    Export:
+      Name: "NatGatewayIP"
