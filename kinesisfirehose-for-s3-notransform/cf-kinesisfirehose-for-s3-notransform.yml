@@ -1,0 +1,113 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Kinesis Firehose(S3 Destination)"
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: "Kinesis Firehose(S3 Destination)"
+        Parameters:
+          - StreamName
+          - S3Bucket
+          - S3Prefix
+          - S3ErrorPrefix
+
+Parameters:
+  StreamName:
+    Type: "String"
+  S3Bucket:
+    Type: "String"
+  S3Prefix:
+    Type: "String"
+  S3ErrorPrefix:
+    Type: "String"
+
+Resources:
+  IAMRole:
+    Type: "AWS::IAM::Role"
+    DeletionPolicy: "Delete"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service: "firehose.amazonaws.com"
+            Action: "sts:AssumeRole"
+            Condition:
+              StringEquals:
+                sts:ExternalId: !Ref "AWS::AccountId"
+      # ManagedPolicyArns:
+      #   - String
+      MaxSessionDuration: 3600
+      Path: "/role/"
+      # PermissionsBoundary: String
+      Policies:
+        - 
+          PolicyName: !Sub policy-kinesis-${StreamName}
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action: "glue:GetTableVersions"
+                Resource: "*"
+              -
+                Effect: "Allow"
+                Action:
+                  - "s3:AbortMultipartUpload"
+                  - "s3:GetBucketLocation"
+                  - "s3:GetObject"
+                  - "s3:ListBucket"
+                  - "s3:ListBucketMultipartUploads"
+                  - "s3:PutObject"
+                Resource:
+                  - !Sub arn:aws:s3:::${S3Bucket}
+                  - !Sub arn:aws:s3:::${S3Bucket}/*
+              - 
+                Effect: "Allow"
+                Action: "logs:PutLogEvents"
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/kinesisfirehose/${StreamName}:*
+              - 
+                Effect: "Allow"
+                Action:
+                  - "kinesis:DescribeStream"
+                  - "kinesis:GetShardIterator"
+                  - "kinesis:GetRecords"
+                Resource: !Sub arn:aws:kinesis:${AWS::Region}:${AWS::AccountId}:stream/${StreamName}
+      RoleName: !Sub kinesis-${StreamName}
+  KinesisFirehose:
+    Type: "AWS::KinesisFirehose::DeliveryStream"
+    DependsOn: "IAMRole"
+    DeletionPolicy: "Delete"
+    Properties:
+      DeliveryStreamName: !Ref StreamName
+      DeliveryStreamType: "DirectPut"
+      # ElasticsearchDestinationConfiguration:
+      #   ElasticsearchDestinationConfiguration
+      # ExtendedS3DestinationConfiguration:
+      #   ExtendedS3DestinationConfiguration
+      # KinesisStreamSourceConfiguration:
+      #   KinesisStreamSourceConfiguration
+      # RedshiftDestinationConfiguration:
+      #   RedshiftDestinationConfiguration
+      S3DestinationConfiguration:
+        BucketARN: !Sub arn:aws:s3:::${S3Bucket}
+        BufferingHints:
+          IntervalInSeconds: 300
+          SizeInMBs: 5
+        CloudWatchLoggingOptions:
+          Enabled: True
+          LogGroupName: !Sub /aws/kinesisfirehose/${StreamName}
+          LogStreamName: !Ref StreamName
+        CompressionFormat: "UNCOMPRESSED"
+        # EncryptionConfiguration:
+        #   KMSEncryptionConfig:
+        #     KMSEncryptionConfig
+        #   NoEncryptionConfig: String
+        ErrorOutputPrefix: !Ref S3ErrorPrefix
+        Prefix: !Ref S3Prefix
+        RoleARN: !GetAtt IAMRole.Arn
+      # SplunkDestinationConfiguration:
+      #   SplunkDestinationConfiguration
