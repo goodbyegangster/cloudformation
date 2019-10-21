@@ -1,0 +1,285 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "AWS Setting for WafCharm"
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: "AWS Setting for WafCharm"
+        Parameters:
+          - "WAFName"
+          - "WAFMetricName"
+          - "ALBArn"
+          - "StreamName"
+          - "LambdaBucket"
+          - "LambdaKey"
+Parameters:
+  WAFName:
+    Type: "String"
+  WAFMetricName:
+    Type: "String"
+    AllowedPattern: "[A-Za-z0-9]+"
+  ALBArn:
+    Type: "String"
+  StreamName:
+    Type: "String"
+    AllowedPattern: "aws-waf-logs-[A-Za-z0-9]+"
+    Default: "aws-waf-logs-XXXXXX"
+  LambdaBucket:
+    Type: "String"
+    Default: "lambda-code-780651922507"
+  LambdaKey:
+    Type: "String"
+    Default: "wafcharm-waflog/index.zip"
+
+Resources:
+  AWSWAF:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-wafregional-webacl.html
+    Type: "AWS::WAFRegional::WebACL"
+    DeletionPolicy: "Delete"
+    Properties: 
+      DefaultAction: 
+        Type: "ALLOW"
+      MetricName: !Ref "WAFMetricName"
+      Name: !Ref "WAFName"
+      # Rules: 
+      #   - ActivatedRule
+  WAFAssociation:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-wafregional-webaclassociation.html
+    Type: "AWS::WAFRegional::WebACLAssociation"
+    DeletionPolicy: "Delete"
+    DependsOn: "AWSWAF"
+    Properties:
+      ResourceArn: !Ref ALBArn
+      WebACLId: !Ref AWSWAF
+  S3Bucket:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-properties-s3-bucket.html
+    Type: "AWS::S3::Bucket"
+    DependsOn: "WAFAssociation"
+    DeletionPolicy: "Delete"
+    Properties:
+      # AccessControl: String
+      # AccelerateConfiguration:
+      #   AccelerateConfiguration
+      # AnalyticsConfigurations:
+      #   - AnalyticsConfiguration
+      # BucketEncryption: 
+      #   BucketEncryption
+      BucketName: !Sub awslogs-waf-${AWS::AccountId}
+      # CorsConfiguration:
+      #   CorsConfiguration
+      # InventoryConfigurations:
+      #   - InventoryConfiguration 
+      LifecycleConfiguration:
+        Rules:
+          -
+            # AbortIncompleteMultipartUpload: 
+            #   AbortIncompleteMultipartUpload
+            # ExpirationDate: String
+            ExpirationInDays: "365"
+            Id: !Sub s3-lifecycle-rule
+            NoncurrentVersionExpirationInDays: "365"
+            # NoncurrentVersionTransitions:
+            #   - NoncurrentVersionTransition
+            # Prefix: String
+            Status: "Enabled"
+            # TagFilters: 
+            #   - TagFilter
+            # Transitions:
+            #   - Transition
+      # LoggingConfiguration:
+      #   LoggingConfiguration
+      # MetricsConfigurations: 
+      #   - MetricsConfiguration
+      # NotificationConfiguration:
+      #   NotificationConfiguration
+      # PublicAccessBlockConfiguration: 
+      #   PublicAccessBlockConfiguration
+      # ReplicationConfiguration:
+      #   ReplicationConfiguration
+      Tags:
+        - Key: "String"
+          Value: "String"
+      # VersioningConfiguration:
+      #   VersioningConfiguration
+      # WebsiteConfiguration:
+      #   WebsiteConfiguration
+  IAMRoleForKinesis:
+    Type: "AWS::IAM::Role"
+    DependsOn: "S3Bucket"
+    DeletionPolicy: "Delete"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service: "firehose.amazonaws.com"
+            Action: "sts:AssumeRole"
+            Condition:
+              StringEquals:
+                sts:ExternalId: !Ref "AWS::AccountId"
+      # ManagedPolicyArns:
+      #   - String
+      MaxSessionDuration: 3600
+      Path: "/role/"
+      # PermissionsBoundary: String
+      Policies:
+        - 
+          PolicyName: !Sub policy-kinesis-${StreamName}
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action: "glue:GetTableVersions"
+                Resource: "*"
+              -
+                Effect: "Allow"
+                Action:
+                  - "s3:AbortMultipartUpload"
+                  - "s3:GetBucketLocation"
+                  - "s3:GetObject"
+                  - "s3:ListBucket"
+                  - "s3:ListBucketMultipartUploads"
+                  - "s3:PutObject"
+                Resource:
+                  - !Sub arn:aws:s3:::awslogs-waf-${AWS::AccountId}
+                  - !Sub arn:aws:s3:::awslogs-waf-${AWS::AccountId}/*
+              - 
+                Effect: "Allow"
+                Action: "logs:PutLogEvents"
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/kinesisfirehose/${StreamName}:*
+              - 
+                Effect: "Allow"
+                Action:
+                  - "kinesis:DescribeStream"
+                  - "kinesis:GetShardIterator"
+                  - "kinesis:GetRecords"
+                Resource: !Sub arn:aws:kinesis:${AWS::Region}:${AWS::AccountId}:stream/${StreamName}
+      RoleName: !Sub role-for-${StreamName}
+  KinesisFirehose:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-kinesisfirehose-deliverystream.html
+    Type: "AWS::KinesisFirehose::DeliveryStream"
+    DependsOn: "IAMRole"
+    DependsOn: "IAMRoleForKinesis"
+    DeletionPolicy: "Delete"
+    Properties:
+      DeliveryStreamName: !Ref StreamName
+      DeliveryStreamType: "DirectPut"
+      # ElasticsearchDestinationConfiguration:
+      #   ElasticsearchDestinationConfiguration
+      # ExtendedS3DestinationConfiguration:
+      #   ExtendedS3DestinationConfiguration
+      # KinesisStreamSourceConfiguration:
+      #   KinesisStreamSourceConfiguration
+      # RedshiftDestinationConfiguration:
+      #   RedshiftDestinationConfiguration
+      S3DestinationConfiguration:
+        BucketARN: !Sub arn:aws:s3:::awslogs-waf-${AWS::AccountId}
+        BufferingHints:
+          IntervalInSeconds: 60
+          SizeInMBs: 5
+        CloudWatchLoggingOptions:
+          Enabled: True
+          LogGroupName: !Sub /aws/kinesisfirehose/${StreamName}
+          LogStreamName: !Ref StreamName
+        CompressionFormat: "GZIP"
+        # EncryptionConfiguration:
+        #   KMSEncryptionConfig:
+        #     KMSEncryptionConfig
+        #   NoEncryptionConfig: String
+        ErrorOutputPrefix: !Sub error/${StreamName}/
+        Prefix: !Sub ${StreamName}/
+        RoleARN: !GetAtt IAMRoleForKinesis.Arn
+      # SplunkDestinationConfiguration:
+      #   SplunkDestinationConfiguration
+  IAMRoleForLambda:
+    Type: "AWS::IAM::Role"
+    DependsOn: "KinesisFirehose"
+    DeletionPolicy: "Delete"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service: "lambda.amazonaws.com"
+            Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AWSLambdaExecute"
+      MaxSessionDuration: 3600
+      Path: "/role/"
+      # PermissionsBoundary: String
+      Policies:
+        - 
+          PolicyName: "wafcharm-waflog-s3-read"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action:
+                  - "s3:GetObject"
+                Resource:
+                  - !Sub arn:aws:s3:::awslogs-waf-${AWS::AccountId}/*
+        - 
+          PolicyName: "wafcharm-waflog-s3-put"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action:
+                  - "s3:*"
+                Resource:
+                  - "arn:aws:s3:::wafcharm.com/"
+                  - "arn:aws:s3:::wafcharm.com/*"
+      RoleName: "wafcharm-waflog"
+  Lambda:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-lambda-function.html
+    Type: "AWS::Lambda::Function"
+    DependsOn: "IAMRoleForLambda"
+    DeletionPolicy: "Delete"
+    Properties:
+      Code: 
+        S3Bucket: !Ref "LambdaBucket"
+        S3Key: !Ref "LambdaKey"
+        # S3ObjectVersion: String
+        # ZipFile: String
+      # DeadLetterConfig: 
+      #   DeadLetterConfig
+      Description: "For WafCharm"
+      # Environment: 
+      #   Environment
+      FunctionName: "wafcharm-waflog"
+      Handler: "index.handler"
+      # KmsKeyArn: String
+      # Layers: 
+      #   - String
+      MemorySize: 128
+      # ReservedConcurrentExecutions: Integer
+      Role: !GetAtt IAMRoleForLambda.Arn
+      Runtime: "nodejs8.10"
+      Tags: 
+        - Key: "String"
+          Value: "String"
+      Timeout: 60
+      # TracingConfig: 
+      #   TracingConfig
+      # VpcConfig: 
+      #   VpcConfig
+  LambdaPermission:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-lambda-permission.html
+    Type: "AWS::Lambda::Permission"
+    DependsOn: "Lambda"
+    DeletionPolicy: "Delete"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      # EventSourceToken: String
+      FunctionName: !GetAtt Lambda.Arn
+      Principal: "s3.amazonaws.com"
+      SourceAccount: !Ref "AWS::AccountId"
+      SourceArn: !GetAtt S3Bucket.Arn
