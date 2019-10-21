@@ -1,0 +1,100 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Glue Dev Endpoint"
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: "Glue Dev Endpoint"
+        Parameters:
+          - EndpointName
+          - VpcId
+          - SubnetId
+          - PublicKey
+
+Parameters:
+  EndpointName:
+    Type: "String"
+  VpcId:
+    Type: "AWS::EC2::VPC::Id"
+  SubnetId:
+    Type: "AWS::EC2::Subnet::Id"
+  PublicKey:
+    Type: "String"
+
+Resources:
+  IAMRole:
+    Type: "AWS::IAM::Role"
+    DeletionPolicy: "Delete"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service: "glue.amazonaws.com"
+            Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+        - "arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole"
+      MaxSessionDuration: 3600
+      Path: "/role/"
+      # PermissionsBoundary: String
+      # Policies: Json
+      RoleName: "GlueDevEndpoint"
+  SecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    DeletionPolicy: "Delete"
+    DependsOn: "IAMRole"
+    Properties:
+      GroupName: "self-reference-group"
+      Tags:
+        - Key: "Name"
+          Value: "self-reference-group"
+      GroupDescription: "Self Reference"
+      VpcId: !Ref VpcId
+  SecurityGroupIgress1:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group-ingress.html
+    Type: "AWS::EC2::SecurityGroupIngress"
+    DeletionPolicy: "Delete"
+    DependsOn: "SecurityGroup"
+    Properties:
+      GroupId: !GetAtt SecurityGroup.GroupId
+      IpProtocol: "tcp"
+      FromPort: 0
+      ToPort: 65535
+      SourceSecurityGroupId: !GetAtt SecurityGroup.GroupId
+  SecurityGroupIgress2:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group-ingress.html
+    Type: "AWS::EC2::SecurityGroupIngress"
+    DeletionPolicy: "Delete"
+    DependsOn: "SecurityGroupIgress1"
+    Properties:
+      GroupId: !GetAtt SecurityGroup.GroupId
+      IpProtocol: "tcp"
+      FromPort: 0
+      ToPort: 65535
+      CidrIp: "0.0.0.0/0"
+  GlueDevEndpoint:
+  # https://docs.aws.amazon.com/en_pv/AWSCloudFormation/latest/UserGuide/aws-resource-glue-devendpoint.html
+    Type: AWS::Glue::DevEndpoint
+    DeletionPolicy: "Delete"
+    DependsOn: "SecurityGroupIgress2"
+    Properties:
+      Arguments:
+        GLUE_PYTHON_VERSION: 3
+      EndpointName: !Ref EndpointName
+      # ExtraJarsS3Path: String
+      # ExtraPythonLibsS3Path: String
+      # GlueVersion: String
+      NumberOfNodes: 2
+      # NumberOfWorkers: Integer
+      PublicKey: !Ref PublicKey
+      RoleArn: !GetAtt IAMRole.Arn
+      # SecurityConfiguration: String
+      SecurityGroupIds:
+        - !GetAtt SecurityGroup.GroupId
+      SubnetId: !Ref SubnetId
+      # Tags: Json
+      # WorkerType: String
