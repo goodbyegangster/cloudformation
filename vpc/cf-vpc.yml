@@ -1,0 +1,329 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "VPC"
+
+Resources:
+  VPC:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-vpc.html
+    Type: "AWS::EC2::VPC"
+    DeletionPolicy: "Delete"
+    Properties:
+      CidrBlock: "10.0.0.0/16"
+      EnableDnsHostnames: True
+      EnableDnsSupport: True
+      InstanceTenancy: "default"
+      Tags:
+        - Key: "Name"
+          Value: "vpc-sample"
+  PublicSubnetAtA:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet.html
+    Type: "AWS::EC2::Subnet"
+    DeletionPolicy: "Delete"
+    DependsOn: "VPC"
+    Properties:
+      # AssignIpv6AddressOnCreation: Boolean
+      AvailabilityZone: "ap-northeast-1a"
+      CidrBlock: "10.0.0.0/24"
+      # Ipv6CidrBlock: String
+      MapPublicIpOnLaunch: "true"
+      Tags:
+        - Key: "Name"
+          Value: "subnet-public-sample-a"
+      VpcId: !Ref VPC
+  PublicSubnetAtC:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet.html
+    Type: "AWS::EC2::Subnet"
+    DeletionPolicy: "Delete"
+    DependsOn: "VPC"
+    Properties:
+      # AssignIpv6AddressOnCreation: Boolean
+      AvailabilityZone: "ap-northeast-1c"
+      CidrBlock: "10.0.1.0/24"
+      # Ipv6CidrBlock: String
+      MapPublicIpOnLaunch: "true"
+      Tags:
+        - Key: "Name"
+          Value: "subnet-public-sample-c"
+      VpcId: !Ref VPC
+  PublicSubnetAtD:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet.html
+    Type: "AWS::EC2::Subnet"
+    DeletionPolicy: "Delete"
+    DependsOn: "VPC"
+    Properties:
+      # AssignIpv6AddressOnCreation: Boolean
+      AvailabilityZone: "ap-northeast-1d"
+      CidrBlock: "10.0.2.0/24"
+      # Ipv6CidrBlock: String
+      MapPublicIpOnLaunch: "true"
+      Tags:
+        - Key: "Name"
+          Value: "subnet-public-sample-d"
+      VpcId: !Ref VPC
+  ProtectedSubnetAtA:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet.html
+    Type: "AWS::EC2::Subnet"
+    DeletionPolicy: "Delete"
+    DependsOn: "VPC"
+    Properties:
+      # AssignIpv6AddressOnCreation: Boolean
+      AvailabilityZone: "ap-northeast-1a"
+      CidrBlock: "10.0.100.0/24"
+      # Ipv6CidrBlock: String
+      MapPublicIpOnLaunch: "true"
+      Tags:
+        - Key: "Name"
+          Value: "subnet-protected-sample-a"
+      VpcId: !Ref VPC
+  ProtectedSubnetAtC:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet.html
+    Type: "AWS::EC2::Subnet"
+    DeletionPolicy: "Delete"
+    DependsOn: "VPC"
+    Properties:
+      # AssignIpv6AddressOnCreation: Boolean
+      AvailabilityZone: "ap-northeast-1c"
+      CidrBlock: "10.0.101.0/24"
+      # Ipv6CidrBlock: String
+      MapPublicIpOnLaunch: "true"
+      Tags:
+        - Key: "Name"
+          Value: "subnet-protected-sample-c"
+      VpcId: !Ref VPC
+  ProtectedSubnetAtD:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet.html
+    Type: "AWS::EC2::Subnet"
+    DeletionPolicy: "Delete"
+    DependsOn: "VPC"
+    Properties:
+      # AssignIpv6AddressOnCreation: Boolean
+      AvailabilityZone: "ap-northeast-1d"
+      CidrBlock: "10.0.102.0/24"
+      # Ipv6CidrBlock: String
+      MapPublicIpOnLaunch: "true"
+      Tags:
+        - Key: "Name"
+          Value: "subnet-protected-sample-d"
+      VpcId: !Ref VPC
+  PrivateSubnetAtA:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet.html
+    Type: "AWS::EC2::Subnet"
+    DeletionPolicy: "Delete"
+    DependsOn: "VPC"
+    Properties:
+      # AssignIpv6AddressOnCreation: Boolean
+      AvailabilityZone: "ap-northeast-1a"
+      CidrBlock: "10.0.200.0/24"
+      # Ipv6CidrBlock: String
+      MapPublicIpOnLaunch: "true"
+      Tags:
+        - Key: "Name"
+          Value: "subnet-private-sample-a"
+      VpcId: !Ref VPC
+  PrivateSubnetAtC:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet.html
+    Type: "AWS::EC2::Subnet"
+    DeletionPolicy: "Delete"
+    DependsOn: "VPC"
+    Properties:
+      # AssignIpv6AddressOnCreation: Boolean
+      AvailabilityZone: "ap-northeast-1c"
+      CidrBlock: "10.0.201.0/24"
+      # Ipv6CidrBlock: String
+      MapPublicIpOnLaunch: "true"
+      Tags:
+        - Key: "Name"
+          Value: "subnet-private-sample-c"
+      VpcId: !Ref VPC
+  PrivateSubnetAtD:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet.html
+    Type: "AWS::EC2::Subnet"
+    DeletionPolicy: "Delete"
+    DependsOn: "VPC"
+    Properties:
+      # AssignIpv6AddressOnCreation: Boolean
+      AvailabilityZone: "ap-northeast-1d"
+      CidrBlock: "10.0.202.0/24"
+      # Ipv6CidrBlock: String
+      MapPublicIpOnLaunch: "true"
+      Tags:
+        - Key: "Name"
+          Value: "subnet-private-sample-d"
+      VpcId: !Ref VPC
+  iGW:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-internetgateway.html
+    Type: "AWS::EC2::InternetGateway"
+    DeletionPolicy: "Delete"
+    DependsOn: "VPC"
+    Properties: 
+      Tags: 
+        - Key: "Name"
+          Value: "igw-sample"
+  VPCAttach:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-vpc-gateway-attachment.html
+    Type: "AWS::EC2::VPCGatewayAttachment"
+    DeletionPolicy: "Delete"
+    DependsOn: "iGW"
+    Properties:
+      InternetGatewayId: !Ref iGW
+      VpcId: !Ref VPC
+      # VpnGatewayId: String
+  ElasticIpForNgwAtA:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-eip.html
+    Type: "AWS::EC2::EIP"
+    DeletionPolicy: "Delete"
+    DependsOn: "VPC"
+    Properties:
+      Domain: "vpc"
+      # InstanceId: String
+      # PublicIpv4Pool: String
+  NatGatewayAtA:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-natgateway.html
+    Type: "AWS::EC2::NatGateway"
+    DeletionPolicy: "Delete"
+    DependsOn: "ElasticIpForNgwAtA"
+    Properties:
+      AllocationId: !GetAtt ElasticIpForNgwAtA.AllocationId
+      SubnetId: !Ref PublicSubnetAtA
+      Tags: 
+        - Key: "Name"
+          Value: "ngw-sample-a"
+
+# PublicRoute
+  PublicRouteTable:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-route-table.html
+    Type: "AWS::EC2::RouteTable"
+    DeletionPolicy: "Delete"
+    DependsOn: "iGW"
+    Properties: 
+      Tags: 
+        - Key: "Name"
+          Value: "rtb-public-sample"
+      VpcId: !Ref VPC
+  PublicRoute:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-route.html
+    Type: "AWS::EC2::Route"
+    DeletionPolicy: "Delete"
+    DependsOn: "PublicRouteTable"
+    Properties: 
+      DestinationCidrBlock: "0.0.0.0/0"
+      # DestinationIpv6CidrBlock: String
+      # EgressOnlyInternetGatewayId: String
+      GatewayId: !Ref iGW
+      # InstanceId: String
+      # NatGatewayId: String
+      # NetworkInterfaceId: String
+      RouteTableId: !Ref PublicRouteTable
+      # TransitGatewayId: String
+      # VpcPeeringConnectionId: String
+  PublicRouteTableAssociationA:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet-route-table-assoc.html
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    DeletionPolicy: "Delete"
+    DependsOn: "PublicRouteTable"
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnetAtA
+  PublicRouteTableAssociationC:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet-route-table-assoc.html
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    DeletionPolicy: "Delete"
+    DependsOn: "PublicRouteTable"
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnetAtC
+  PublicRouteTableAssociationD:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet-route-table-assoc.html
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    DeletionPolicy: "Delete"
+    DependsOn: "PublicRouteTable"
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnetAtD
+
+# ProtectedRoute
+  ProtectedRouteTable:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-route-table.html
+    Type: "AWS::EC2::RouteTable"
+    DeletionPolicy: "Delete"
+    DependsOn: "NatGatewayAtA"
+    Properties: 
+      Tags: 
+        - Key: "Name"
+          Value: "rtb-protected-sample"
+      VpcId: !Ref VPC
+  ProtectedRoute:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-route.html
+    Type: "AWS::EC2::Route"
+    DeletionPolicy: "Delete"
+    DependsOn: "ProtectedRouteTable"
+    Properties: 
+      DestinationCidrBlock: "0.0.0.0/0"
+      # DestinationIpv6CidrBlock: String
+      # EgressOnlyInternetGatewayId: String
+      # GatewayId: String
+      # InstanceId: String
+      NatGatewayId: !Ref NatGatewayAtA
+      # NetworkInterfaceId: String
+      RouteTableId: !Ref ProtectedRouteTable
+      # TransitGatewayId: String
+      # VpcPeeringConnectionId: String
+  ProtectedRouteTableAssociationA:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet-route-table-assoc.html
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    DeletionPolicy: "Delete"
+    DependsOn: "ProtectedRouteTable"
+    Properties:
+      RouteTableId: !Ref ProtectedRouteTable
+      SubnetId: !Ref ProtectedSubnetAtA
+  ProtectedRouteTableAssociationC:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet-route-table-assoc.html
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    DeletionPolicy: "Delete"
+    DependsOn: "ProtectedRouteTable"
+    Properties:
+      RouteTableId: !Ref ProtectedRouteTable
+      SubnetId: !Ref ProtectedSubnetAtC
+  ProtectedRouteTableAssociationD:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet-route-table-assoc.html
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    DeletionPolicy: "Delete"
+    DependsOn: "ProtectedRouteTable"
+    Properties:
+      RouteTableId: !Ref ProtectedRouteTable
+      SubnetId: !Ref ProtectedSubnetAtD
+
+# PrivateRoute
+  PrivateRouteTable:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-route-table.html
+    Type: "AWS::EC2::RouteTable"
+    DeletionPolicy: "Delete"
+    DependsOn: "PrivateSubnetAtD"
+    Properties: 
+      Tags: 
+        - Key: "Name"
+          Value: "rtb-private-sample"
+      VpcId: !Ref VPC
+  PrivateRouteTableAssociationA:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet-route-table-assoc.html
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    DeletionPolicy: "Delete"
+    DependsOn: "PrivateRouteTable"
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnetAtA
+  PrivateRouteTableAssociationC:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet-route-table-assoc.html
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    DeletionPolicy: "Delete"
+    DependsOn: "PrivateRouteTable"
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnetAtC
+  PrivateRouteTableAssociationD:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-subnet-route-table-assoc.html
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    DeletionPolicy: "Delete"
+    DependsOn: "PrivateRouteTable"
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnetAtD
