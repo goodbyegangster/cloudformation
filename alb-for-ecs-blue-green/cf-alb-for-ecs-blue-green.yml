@@ -1,0 +1,163 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CFn for ALB(ECS Blue/Green)"
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: "CFn for ALB(ECS Blue/Green)"
+        Parameters:
+          - LoadBlaanbcerName
+          - Vpc
+          - Subnets
+          - SecurityGroups
+Parameters:
+  LoadBlaanbcerName:
+    Type: "String"
+  Vpc:
+    Type: "AWS::EC2::VPC::Id"
+  Subnets:
+    Type: "List<AWS::EC2::Subnet::Id>"
+  SecurityGroups:
+    Type: "List<AWS::EC2::SecurityGroup::Id>"
+
+Resources:
+  LoadBalancer:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-elasticloadbalancingv2-loadbalancer.html
+    Type: "AWS::ElasticLoadBalancingV2::LoadBalancer"
+    DeletionPolicy: "Delete"
+    Properties:
+      IpAddressType: "ipv4"
+      LoadBalancerAttributes:
+        - Key: "access_logs.s3.enabled"
+          Value: false
+        # - Key: "access_logs.s3.bucket"
+        #   Value: String
+        # - Key: "access_logs.s3.prefix"
+        #   Value: String
+        - Key: "deletion_protection.enabled"
+          Value: false
+        - Key: "idle_timeout.timeout_seconds"
+          Value: 60
+        - Key: "routing.http2.enabled"
+          Value: true
+      Name: !Ref LoadBlaanbcerName
+      Scheme: "internet-facing"
+      SecurityGroups: !Ref SecurityGroups
+      # SubnetMappings:
+      #   - SubnetMapping
+      Subnets: !Ref Subnets
+      Tags:
+        - Key: tag-key
+          Value: tag-value
+      Type: "application"
+
+  TargetGroup80:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-elasticloadbalancingv2-targetgroup.html
+    DeletionPolicy: "Delete"
+    DependsOn: "LoadBalancer"
+    Properties:
+      HealthCheckEnabled: true
+      # HealthCheckIntervalSeconds: Integer
+      HealthCheckPath: "/"
+      HealthCheckPort: "80"
+      HealthCheckProtocol: "HTTP"
+      # HealthCheckTimeoutSeconds: Integer
+      # HealthyThresholdCount: Integer
+      Matcher:
+        HttpCode: "200"
+      Name: !Sub ${LoadBlaanbcerName}-target-group-1
+      Port: 80
+      Protocol: "HTTP"
+      Tags:
+        - Key: tag-key
+          Value: tag-value
+      # TargetGroupAttributes:
+      #   - TargetGroupAttribute
+      # Targets:
+      #   - TargetDescription
+      TargetType: "ip"
+      # UnhealthyThresholdCount: Integer
+      VpcId: !Ref Vpc
+
+  Listener80:
+    Type: "AWS::ElasticLoadBalancingV2::Listener"
+    # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-elasticloadbalancingv2-listener.html
+    DeletionPolicy: "Delete"
+    DependsOn: "TargetGroup80"
+    Properties:
+      # Certificates:
+      #   - Certificate
+      DefaultActions:
+        - 
+          # AuthenticateCognitoConfig: 
+          #   AuthenticateCognitoConfig
+          # AuthenticateOidcConfig: 
+          #   AuthenticateOidcConfig
+          # FixedResponseConfig: 
+          #   FixedResponseConfig
+          Order: 1
+          # RedirectConfig: 
+          #   RedirectConfig
+          TargetGroupArn: !Ref TargetGroup80
+          Type: "forward"
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: "HTTP"
+      # SslPolicy: String
+
+  TargetGroup8080:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-elasticloadbalancingv2-targetgroup.html
+    DeletionPolicy: "Delete"
+    DependsOn: "LoadBalancer"
+    Properties:
+      HealthCheckEnabled: true
+      # HealthCheckIntervalSeconds: Integer
+      HealthCheckPath: "/"
+      HealthCheckPort: "80"
+      HealthCheckProtocol: "HTTP"
+      # HealthCheckTimeoutSeconds: Integer
+      # HealthyThresholdCount: Integer
+      Matcher:
+        HttpCode: "200"
+      Name: !Sub ${LoadBlaanbcerName}-target-group-2
+      Port: 80
+      Protocol: "HTTP"
+      Tags:
+        - Key: tag-key
+          Value: tag-value
+      # TargetGroupAttributes:
+      #   - TargetGroupAttribute
+      # Targets:
+      #   - TargetDescription
+      TargetType: "ip"
+      # UnhealthyThresholdCount: Integer
+      VpcId: !Ref Vpc
+
+  Listener8080:
+    Type: "AWS::ElasticLoadBalancingV2::Listener"
+    # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-elasticloadbalancingv2-listener.html
+    DeletionPolicy: "Delete"
+    DependsOn: "TargetGroup8080"
+    Properties:
+      # Certificates:
+      #   - Certificate
+      DefaultActions:
+        - 
+          # AuthenticateCognitoConfig: 
+          #   AuthenticateCognitoConfig
+          # AuthenticateOidcConfig: 
+          #   AuthenticateOidcConfig
+          # FixedResponseConfig: 
+          #   FixedResponseConfig
+          Order: 1
+          # RedirectConfig: 
+          #   RedirectConfig
+          TargetGroupArn: !Ref TargetGroup8080
+          Type: "forward"
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 8080
+      Protocol: "HTTP"
+      # SslPolicy: String
