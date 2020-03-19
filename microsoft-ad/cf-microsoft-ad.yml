@@ -1,0 +1,183 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CFn for MicrosoftAD"
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: "CFn for MicrosoftAD"
+        Parameters:
+          - VPC
+          - Subnets
+          - Edition
+          - DomainName
+          - SubnetForEC2
+          - Ami
+          - S3BucketForSSM
+          - KeyPair
+          - SecurityGroups
+
+Parameters:
+  VPC:
+    Type: "AWS::EC2::VPC::Id"
+  Subnets:
+    Type: "List<AWS::EC2::Subnet::Id>"
+  Edition:
+    Type: "String"
+    AllowedValues:
+      - "Standard"
+      - "Enterprise"
+  DomainName:
+    Type: "String"
+  SubnetForEC2:
+    Type: "AWS::EC2::Subnet::Id"
+  Ami:
+    Type: "String"
+    Default: "ami-0a8e13c1a5bbb828f"      # amazon/Windows_Server-2019-Japanese-Full-Base-2019.12.16
+  S3BucketForSSM:
+    Type: "String"
+  KeyPair:
+    Type: "AWS::EC2::KeyPair::KeyName"
+  SecurityGroups:
+    Type: "List<AWS::EC2::SecurityGroup::Id>"
+
+Resources:
+  MicrosoftAD:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-directoryservice-microsoftad.html
+    Type: "AWS::DirectoryService::MicrosoftAD"
+    DeletionPolicy: "Delete"
+    Properties:
+      # CreateAlias: Boolean
+      Edition: !Ref Edition
+      # EnableSso: Boolean
+      Name: !Ref DomainName
+      Password: "Passw0rd"
+      # ShortName: String
+      VpcSettings:
+        SubnetIds: !Ref Subnets
+        VpcId: !Ref VPC
+  EC2Role:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html#cfn-iam-role-policies
+    Type: "AWS::IAM::Role"
+    DeletionPolicy: "Delete"
+    DependsOn: "MicrosoftAD"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "ec2.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      # Description: "String"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+        - "arn:aws:iam::aws:policy/AmazonSSMDirectoryServiceAccess"
+        - "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+      # MaxSessionDuration: Integer
+      Path: "/"
+      # PermissionsBoundary: String
+      Policies:
+        -
+          PolicyName: "s3access-policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action: "*"
+                Resource:
+                  - !Sub arn:aws:s3:::${S3BucketForSSM}
+                  - !Sub arn:aws:s3:::${S3BucketForSSM}/*
+        # RoleName: "String"
+      # Tags: 
+      #   - Tag
+  InstanceProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    DeletionPolicy: "Delete"
+    DependsOn: "EC2Role"
+    Properties:
+      Path: "/"
+      Roles:
+        - !Ref "EC2Role"
+      # InstanceProfileName: "String"
+  EC2Instance:
+  # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-instance.html#cfn-ec2-instance-networkinterfaces
+    Type: "AWS::EC2::Instance"
+    DeletionPolicy: "Delete"
+    DependsOn: "InstanceProfile"
+    Properties:
+      # AdditionalInfo: "String"
+      # Affinity: "String"
+      # AvailabilityZone: "String"
+      BlockDeviceMappings:
+        - DeviceName: "/dev/sda1"
+          Ebs:
+            DeleteOnTermination: True
+            Encrypted: False
+            # Iops: Integer
+            # KmsKeyId: "String"
+            # SnapshotId: "String"
+            VolumeSize: 50
+            VolumeType: "gp2"
+          # NoDevice: NoDevice
+          # VirtualName: "String"
+      # CpuOptions:
+      #   CpuOptions
+      CreditSpecification:
+        CPUCredits: "unlimited"
+      DisableApiTermination: False
+      EbsOptimized: True
+      # ElasticGpuSpecifications: 
+      #   - ElasticGpuSpecification
+      # ElasticInferenceAccelerators: 
+      #   - ElasticInferenceAccelerator
+      # HostId: String
+      IamInstanceProfile: !Ref "InstanceProfile"
+      ImageId: !Ref Ami
+      InstanceInitiatedShutdownBehavior: "stop"
+      InstanceType: "t3.medium"
+      # Ipv6AddressCount: Integer
+      # Ipv6Addresses: 
+      #   - InstanceIpv6Address
+      # KernelId: String
+      KeyName: !Ref KeyPair
+      # LaunchTemplate: 
+        # LaunchTemplateSpecification
+      # LicenseSpecifications: 
+        # - LicenseSpecification
+      Monitoring: False
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: True
+          DeleteOnTermination: True
+          # Description: "String"
+          DeviceIndex: "0"
+          GroupSet: !Ref "SecurityGroups"
+          # Ipv6AddressCount: Integer
+          # Ipv6Addresses: 
+          #   - InstanceIpv6Address
+          # NetworkInterfaceId: String
+          # PrivateIpAddress: String
+          # PrivateIpAddresses: 
+          #   - PrivateIpAddressSpecification
+          # SecondaryPrivateIpAddressCount: Integer
+          SubnetId: !Ref "SubnetForEC2"
+      # PlacementGroupName: "String"
+      # PrivateIpAddress: "String"
+      # RamdiskId: "String"
+      # SecurityGroupIds:
+      #   - "String"
+      # SecurityGroups:
+      #   - "String"
+      SourceDestCheck: True
+      # SsmAssociations:
+      #   - SsmAssociation
+      # SubnetId: "String"
+      # Tags:
+      #   - Tag
+      Tenancy: "default"
+      # UserData: "String"
+      # Volumes:
+      #   - Volume
