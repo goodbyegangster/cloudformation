@@ -1,0 +1,226 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CFn for AWS SFTP"
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: "CFn for AWS SFTP"
+        Parameters:
+          - PublicKey
+
+Parameters:
+  PublicKey:
+    Type: "String"
+  SftpUser:
+    Type: "String"
+    Default: "zunchan"
+
+Resources:
+  LoggingRole:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html#cfn-iam-role-policies
+    Type: "AWS::IAM::Role"
+    DeletionPolicy: "Delete"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "transfer.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      # Description: "String"
+      # ManagedPolicyArns:
+      #   - String
+      # MaxSessionDuration: Integer
+      Path: "/"
+      # PermissionsBoundary: String
+      Policies:
+        -
+          PolicyName: "cloudwatchlogs-policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action:
+                  - logs:CreateLogStream
+                  - logs:DescribeLogStreams
+                  - logs:CreateLogGroup
+                  - logs:PutLogEvents
+                Resource: "*"
+      RoleName: "sftp-logging-role"
+      # Tags:
+      #   - Tag
+  SFTP:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-transfer-server.html
+    Type: "AWS::Transfer::Server"
+    DeletionPolicy: "Delete"
+    DependsOn: "LoggingRole"
+    Properties:
+      # EndpointDetails: 
+      #   VpcEndpointId: String
+      EndpointType: "PUBLIC"
+      # IdentityProviderDetails: 
+      #   InvocationRole: String
+      #   Url: String
+      IdentityProviderType: "SERVICE_MANAGED"
+      LoggingRole: !GetAtt LoggingRole.Arn
+      # Tags:
+      #   - Key: "sample-key"
+      #     Value: "sample-value"
+  S3Bucket:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-properties-s3-bucket.html
+    Type: "AWS::S3::Bucket"
+    DeletionPolicy: "Delete"
+    Properties:
+      # AccelerateConfiguration:
+      #   AccelerateConfiguration
+      # AccessControl: String
+      # AnalyticsConfigurations:
+      #   - AnalyticsConfiguration
+      # BucketEncryption:
+      #   BucketEncryption
+      BucketName: !Sub sftp-bucket-${AWS::AccountId}
+      # CorsConfiguration:
+      #   CorsConfiguration
+      # InventoryConfigurations:
+      #   - InventoryConfiguration
+      # LifecycleConfiguration:
+      #   LifecycleConfiguration
+      # LoggingConfiguration:
+      #   LoggingConfiguration
+      # MetricsConfigurations:
+      #   - MetricsConfiguration
+      # NotificationConfiguration:
+      #   NotificationConfiguration
+      # ObjectLockConfiguration:
+      #   ObjectLockConfiguration
+      # ObjectLockEnabled: Boolean
+      # PublicAccessBlockConfiguration:
+      #   PublicAccessBlockConfiguration
+      # ReplicationConfiguration:
+      #   ReplicationConfiguration
+      # Tags:
+      #   - Key: "sample-key"
+      #     Value: "sample-value"
+      # VersioningConfiguration:
+      #   VersioningConfiguration
+      # WebsiteConfiguration:
+      #   WebsiteConfiguration
+  UserRole:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html#cfn-iam-role-policies
+    Type: "AWS::IAM::Role"
+    DeletionPolicy: "Delete"
+    DependsOn: "SFTP"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "transfer.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      # Description: "String"
+      # ManagedPolicyArns:
+      #   - String
+      # MaxSessionDuration: Integer
+      Path: "/"
+      # PermissionsBoundary: String
+      Policies:
+        -
+          PolicyName: "s3-policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action:
+                  - "s3:ListBucket"
+                  - "s3:GetBucketLocation"
+                Resource: !Sub arn:aws:s3:::sftp-bucket-${AWS::AccountId}
+              -
+                Effect: "Allow"
+                Action:
+                  - "s3:PutObject"
+                  - "s3:GetObject"
+                  - "s3:DeleteObject"
+                  - "s3:DeleteObjectVersion"
+                  - "s3:GetObjectVersion"
+                  - "s3:GetObjectACL"
+                  - "s3:PutObjectACL"
+                Resource: !Sub arn:aws:s3:::sftp-bucket-${AWS::AccountId}/*
+      RoleName: "sftp-user-role"
+      # Tags:
+      #   - Key: "sample-key"
+      #     Value: "sample-value"
+  User:
+  # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-transfer-user.html
+    Type: "AWS::Transfer::User"
+    DeletionPolicy: "Delete"
+    DependsOn: "UserRole"
+    Properties:
+      HomeDirectory: !Sub "/sftp-bucket-${AWS::AccountId}/user/${SftpUser}"
+      # HomeDirectoryMappings:
+      #   - Entry: String
+      #   - Target: String
+      HomeDirectoryType: "PATH"
+      Policy: >
+          {
+              "Version": "2012-10-17",
+              "Statement": [
+                  {
+                      "Sid": "AllowListingOfUserFolder",
+                      "Action": [
+                          "s3:ListBucket"
+                      ],
+                      "Effect": "Allow",
+                      "Resource": [
+                          "arn:aws:s3:::${transfer:HomeBucket}"
+                      ],
+                      "Condition": {
+                          "StringLike": {
+                              "s3:prefix": [
+                                  "${transfer:HomeFolder}/*",
+                                  "${transfer:HomeFolder}"
+                              ]
+                          }
+                      }
+                  },
+                  {
+                      "Sid": "AWSTransferRequirements",
+                      "Effect": "Allow",
+                      "Action": [
+                          "s3:ListAllMyBuckets",
+                          "s3:GetBucketLocation"
+                      ],
+                      "Resource": "*"
+                  },
+                  {
+                      "Sid": "HomeDirObjectAccess",
+                      "Effect": "Allow",
+                      "Action": [
+                          "s3:PutObject",
+                          "s3:GetObject",
+                          "s3:DeleteObjectVersion",
+                          "s3:DeleteObject",
+                          "s3:GetObjectVersion",
+                          "s3:GetObjectACL",
+                          "s3:PutObjectACL"
+                      ],
+                      "Resource": "arn:aws:s3:::${transfer:HomeDirectory}*"
+                  }
+              ]
+          }
+      Role: !GetAtt UserRole.Arn
+      ServerId: !GetAtt SFTP.ServerId
+      SshPublicKeys:
+        - !Ref PublicKey
+      # Tags:
+      #   - Key: "sample-key"
+      #     Value: "sample-value"
+      UserName: !Ref SftpUser
