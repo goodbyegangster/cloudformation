@@ -1,0 +1,254 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CFn for DataSync Agnet"
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: "CFn for DataSync Agnet"
+        Parameters:
+          - VpcId
+          - SubnetId
+          - Ami
+          - InstanceType
+          - KeyPair
+          - S3BucketForSSM
+          - VpcCidr
+
+Parameters:
+  VpcId:
+    Type: "AWS::EC2::VPC::Id"
+  SubnetId:
+    Type: "AWS::EC2::Subnet::Id"
+  Ami:
+    Type: "String"
+    Default: "ami-0ddfeff6e10d8c311"
+  InstanceType:
+    Type: "String"
+    Default: "m5.2xlarge"
+    AllowedValues:
+      - "m5.2xlarge"
+      - "m5.4xlarge"
+  KeyPair:
+    Type: "AWS::EC2::KeyPair::KeyName"
+  S3BucketForSSM:
+    Type: "String"
+  VpcCidr:
+    Type: "String"
+
+Resources:
+  SecurityGroupForEC2:
+  # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html
+    Type: "AWS::EC2::SecurityGroup"
+    DeletionPolicy: "Delete"
+    Properties:
+      GroupName: "for-datasync-anget"
+      GroupDescription: "for-datasync-anget"
+      # SecurityGroupEgress:
+      #   - Security Group Rule
+      SecurityGroupIngress:
+        - 
+          CidrIp: !Ref VpcCidr
+          # CidrIpv6: String
+          # Description: String
+          IpProtocol: "tcp"
+          FromPort: "80"
+          ToPort: "80"
+          # SourceSecurityGroupId: String
+          # SourceSecurityGroupName: String
+          # SourceSecurityGroupOwnerId: String
+      Tags:
+        - Key: "Name"
+          Value: "for-datasync-anget"
+      VpcId: !Ref "VpcId"
+  EC2Role:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html#cfn-iam-role-policies
+    Type: "AWS::IAM::Role"
+    DependsOn: "SecurityGroupForEC2"
+    DeletionPolicy: "Delete"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "ec2.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      # Description: "String"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+        - "arn:aws:iam::aws:policy/AmazonSSMDirectoryServiceAccess"
+        - "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+      # MaxSessionDuration: Integer
+      Path: "/"
+      # PermissionsBoundary: String
+      Policies:
+        -
+          PolicyName: "s3access-policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action: "*"
+                Resource:
+                  - !Sub arn:aws:s3:::${S3BucketForSSM}
+                  - !Sub arn:aws:s3:::${S3BucketForSSM}/*
+      RoleName: "role-datasync-agent"
+      # Tags:
+      #   - Tag
+  InstanceProfile:
+  # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-instanceprofile.html
+    Type: "AWS::IAM::InstanceProfile"
+    DeletionPolicy: "Delete"
+    DependsOn: "EC2Role"
+    Properties:
+      InstanceProfileName: "profile-datasync-agent"
+      Path: "/"
+      Roles:
+        - !Ref "EC2Role"
+  EC2Instance:
+  # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-instance.html#cfn-ec2-instance-networkinterfaces
+    Type: "AWS::EC2::Instance"
+    DeletionPolicy: "Delete"
+    DependsOn: "InstanceProfile"
+    Properties:
+      # AdditionalInfo: "String"
+      # Affinity: "String"
+      # AvailabilityZone: "String"
+      # BlockDeviceMappings:
+        # - DeviceName: "/dev/xvda"
+          # Ebs:
+            # DeleteOnTermination: True
+            # Encrypted: False
+            # Iops: Integer
+            # KmsKeyId: "String"
+            # SnapshotId: "String"
+            # VolumeSize: 80
+            # VolumeType: "gp2"
+          # NoDevice: NoDevice
+          # VirtualName: "String"
+      # CpuOptions:
+      #   CpuOptions
+      # CreditSpecification:
+      #   CPUCredits: String
+      DisableApiTermination: False
+      EbsOptimized: True
+      # ElasticGpuSpecifications: 
+      #   - ElasticGpuSpecification
+      # ElasticInferenceAccelerators: 
+      #   - ElasticInferenceAccelerator
+      # HostId: String
+      IamInstanceProfile: !Ref "InstanceProfile"
+      ImageId: !Ref Ami
+      InstanceInitiatedShutdownBehavior: "stop"
+      InstanceType: !Ref InstanceType
+      # Ipv6AddressCount: Integer
+      # Ipv6Addresses: 
+      #   - InstanceIpv6Address
+      # KernelId: String
+      KeyName: !Ref KeyPair
+      # LaunchTemplate: 
+        # LaunchTemplateSpecification
+      # LicenseSpecifications: 
+        # - LicenseSpecification
+      Monitoring: False
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: True
+          DeleteOnTermination: True
+          # Description: "String"
+          DeviceIndex: "0"
+          GroupSet:
+            - !Ref "SecurityGroupForEC2"
+          # Ipv6AddressCount: Integer
+          # Ipv6Addresses: 
+          #   - InstanceIpv6Address
+          # NetworkInterfaceId: String
+          # PrivateIpAddress: String
+          # PrivateIpAddresses: 
+          #   - PrivateIpAddressSpecification
+          # SecondaryPrivateIpAddressCount: Integer
+          SubnetId: !Ref "SubnetId"
+      # PlacementGroupName: "String"
+      # PrivateIpAddress: "String"
+      # RamdiskId: "String"
+      # SecurityGroupIds:
+      #   - "String"
+      # SecurityGroups:
+      #   - "String"
+      SourceDestCheck: True
+      # SsmAssociations:
+      #   - SsmAssociation
+      # SubnetId: "String"
+      Tags:
+        - 
+          Key: "Name"
+          Value: "DataSyncAgent"
+      Tenancy: "default"
+      # UserData: "String"
+      # Volumes:
+      #   - Volume
+  SecurityGroupForVpcE:
+  # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html
+    Type: "AWS::EC2::SecurityGroup"
+    DeletionPolicy: "Delete"
+    DependsOn: "EC2Instance"
+    Properties:
+      GroupName: "for-datasync-vpc-endpoint"
+      GroupDescription: "for-datasync-vpc-endpoint"
+      # SecurityGroupEgress:
+      #   - Security Group Rule
+      SecurityGroupIngress:
+        -
+          # CidrIp: String
+          # CidrIpv6: String
+          # Description: String
+          IpProtocol: "tcp"
+          FromPort: "22"
+          ToPort: "22"
+          SourceSecurityGroupId: !Ref "SecurityGroupForEC2"
+          # SourceSecurityGroupName: String
+          # SourceSecurityGroupOwnerId: String
+        -
+          # CidrIp: String
+          # CidrIpv6: String
+          # Description: String
+          IpProtocol: "tcp"
+          FromPort: "443"
+          ToPort: "443"
+          SourceSecurityGroupId: !Ref "SecurityGroupForEC2"
+          # SourceSecurityGroupName: String
+          # SourceSecurityGroupOwnerId: String
+        -
+          # CidrIp: String
+          # CidrIpv6: String
+          # Description: String
+          IpProtocol: "tcp"
+          FromPort: "1024"
+          ToPort: "1064"
+          SourceSecurityGroupId: !Ref "SecurityGroupForEC2"
+          # SourceSecurityGroupName: String
+          # SourceSecurityGroupOwnerId: String
+      Tags:
+        - Key: "Name"
+          Value: "for-datasync-vpc-endpoint"
+      VpcId: !Ref "VpcId"
+  VPCEndpoint:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-vpcendpoint.html
+    Type: "AWS::EC2::VPCEndpoint"
+    DependsOn: "SecurityGroupForVpcE"
+    DeletionPolicy: "Delete"
+    Properties:
+      # PolicyDocument: Json
+      PrivateDnsEnabled: false
+      # RouteTableIds:
+      #   - String
+      SecurityGroupIds:
+        - !Ref "SecurityGroupForVpcE"
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.datasync
+      SubnetIds:
+        - !Ref "SubnetId"
+      VpcEndpointType: "Interface"
+      VpcId: !Ref "VpcId"

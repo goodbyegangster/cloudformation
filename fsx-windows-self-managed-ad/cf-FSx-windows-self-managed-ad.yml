@@ -1,0 +1,147 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CFn for FSx Windows - self-managed AD"
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: "CFn for FSx Windows - self-managed AD"
+        Parameters:
+          - VpcId
+          - Subnets
+          - SecurityGroups
+          - DnsIp
+          - DomainName
+          - OUName
+          - FSAdminGroup
+          - UserName
+          - Password
+          - AccessCIDR
+
+Parameters:
+  VpcId:
+    Type: "AWS::EC2::VPC::Id"
+  Subnets:
+    Type: "List<AWS::EC2::Subnet::Id>"
+  DnsIp:
+    Type: "String"
+  DomainName:
+    Type: "String"
+    Default: "example.com"
+  OUName:
+    Type: "String"
+    Default: "OU=FSx,DC=example,DC=com"
+  FSAdminGroup:
+    Type: "String"
+    Default: "FSxAdmins"
+  UserName:
+    Type: "String"
+    Default: "FSxAdmin"
+  Password:
+    Type: "String"
+    Default: "Passw0rd"
+    NoEcho: true
+  AccessCIDR:
+    Type: "String"
+    Default: "0.0.0.0/0"
+
+Resources:
+  SecurityGroup:
+  # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group-rule.html
+    Type: "AWS::EC2::SecurityGroup"
+    DeletionPolicy: "Delete"
+    Properties:
+      GroupName: "for-fsx-windows"
+      GroupDescription: "for-fsx-windows"
+      # SecurityGroupEgress:
+      #   - Security Group Rule
+      SecurityGroupIngress:
+        - 
+          CidrIp: !Ref AccessCIDR
+          # CidrIpv6: String
+          # Description: String
+          IpProtocol: "tcp"
+          FromPort: "445"
+          ToPort: "445"
+          # SourceSecurityGroupId: String
+          # SourceSecurityGroupName: String
+          # SourceSecurityGroupOwnerId: String
+        - 
+          CidrIp: !Ref AccessCIDR
+          # CidrIpv6: String
+          # Description: String
+          IpProtocol: "udp"
+          FromPort: "445"
+          ToPort: "445"
+          # SourceSecurityGroupId: String
+          # SourceSecurityGroupName: String
+          # SourceSecurityGroupOwnerId: String
+        - 
+          CidrIp: !Ref AccessCIDR
+          # CidrIpv6: String
+          # Description: String
+          IpProtocol: "tcp"
+          FromPort: "135"
+          ToPort: "135"
+          # SourceSecurityGroupId: String
+          # SourceSecurityGroupName: String
+          # SourceSecurityGroupOwnerId: String
+        - 
+          CidrIp: !Ref AccessCIDR
+          # CidrIpv6: String
+          # Description: String
+          IpProtocol: "tcp"
+          FromPort: "1024"
+          ToPort: "65535"
+          # SourceSecurityGroupId: String
+          # SourceSecurityGroupName: String
+          # SourceSecurityGroupOwnerId: String
+        - 
+          CidrIp: !Ref AccessCIDR
+          # CidrIpv6: String
+          # Description: String
+          IpProtocol: "udp"
+          FromPort: "1024"
+          ToPort: "65535"
+          # SourceSecurityGroupId: String
+          # SourceSecurityGroupName: String
+          # SourceSecurityGroupOwnerId: String
+      Tags:
+        - Key: "Name"
+          Value: "for-fsx-windows"
+      VpcId: !Ref "VpcId"
+  FSxWindows:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-fsx-filesystem.html
+    Type: "AWS::FSx::FileSystem"
+    DeletionPolicy: "Delete"
+    DependsOn: "SecurityGroup"
+    Properties:
+      # BackupId: String
+      FileSystemType: "WINDOWS"
+      # KmsKeyId: String
+      # LustreConfiguration:
+      #   LustreConfiguration
+      SecurityGroupIds:
+        - !Ref SecurityGroup
+      StorageCapacity: 32
+      SubnetIds: !Ref Subnets
+      Tags:
+        - Key: "Name"
+          Value: "sample"
+      WindowsConfiguration:
+        # ActiveDirectoryId: String
+        AutomaticBackupRetentionDays: 0
+        CopyTagsToBackups: true
+        # DailyAutomaticBackupStartTime: "HH:MM"
+        DeploymentType: "SINGLE_AZ_1"
+        # PreferredSubnetId: String
+        SelfManagedActiveDirectoryConfiguration:
+          DnsIps:
+            - !Ref DnsIp
+          DomainName: !Ref DomainName
+          FileSystemAdministratorsGroup: !Ref FSAdminGroup
+          OrganizationalUnitDistinguishedName: !Ref OUName
+          Password: !Ref Password
+          UserName: !Ref UserName
+        ThroughputCapacity: 8
+        # WeeklyMaintenanceStartTime: "d:HH:MM"

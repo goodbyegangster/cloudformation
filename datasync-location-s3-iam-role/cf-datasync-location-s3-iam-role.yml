@@ -1,0 +1,64 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CFn for DataSync S3 Access IAMRole"
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: "CFn for DataSync S3 Access IAMRole"
+        Parameters:
+          - S3Bucket
+
+Parameters:
+  S3Bucket:
+    Type: "String"
+
+Resources:
+  IAMRole:
+  # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html
+    Type: "AWS::IAM::Role"
+    DeletionPolicy: "Delete"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "datasync.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      # Description: "String"
+      # ManagedPolicyArns:
+      #   - String
+      # MaxSessionDuration: Integer
+      Path: "/"
+      # PermissionsBoundary: String
+      Policies:
+        -
+          PolicyName: "s3access-policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action:
+                  - "s3:GetBucketLocation"
+                  - "s3:ListBucket"
+                  - "s3:ListBucketMultipartUploads"
+                  - "s3:HeadBucket"
+                Resource:
+                  - !Sub arn:aws:s3:::${S3Bucket}
+              -
+                Effect: "Allow"
+                Action:
+                  - "s3:AbortMultipartUpload"
+                  - "s3:DeleteObject"
+                  - "s3:GetObject"
+                  - "s3:ListMultipartUploadParts"
+                  - "s3:PutObject"
+                Resource:
+                  - !Sub arn:aws:s3:::${S3Bucket}/*
+      RoleName: "role-datasync-s3-access-sample"
+      # Tags:
+      #   - Tag
