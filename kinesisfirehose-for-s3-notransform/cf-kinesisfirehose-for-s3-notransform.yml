@@ -19,8 +19,10 @@ Parameters:
     Type: "String"
   S3Prefix:
     Type: "String"
+    Default: "sample/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/"
   S3ErrorPrefix:
     Type: "String"
+    Default: "error/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/!{firehose:error-output-type}"
 
 Resources:
   IAMRole:
