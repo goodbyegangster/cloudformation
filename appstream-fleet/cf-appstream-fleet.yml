@@ -1,0 +1,50 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "AppStream Fleet"
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: "AppStream Fleet"
+        Parameters:
+          - ImageName
+          - SubnetIds
+          - SecurityGroupIds
+
+Parameters:
+  ImageName:
+    Type: "String"
+  SubnetIds:
+    Type: "List<AWS::EC2::Subnet::Id>"
+    Description: "Maximum 2"
+  SecurityGroupIds:
+    Type: "List<AWS::EC2::SecurityGroup::Id>"
+
+Resources:
+  Fleet:
+    Type: "AWS::AppStream::Fleet"
+    # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-resource-appstream-fleet.html
+    DeletionPolicy: "Delete"
+    Properties:
+      ComputeCapacity:
+        DesiredInstances: 1
+      Description: "Sample Fleet"
+      DisconnectTimeoutInSeconds: 900
+      DisplayName: "sample_fleet"
+      # DomainJoinInfo:
+      #   DirectoryName: String
+      #   OrganizationalUnitDistinguishedName: String
+      EnableDefaultInternetAccess: True
+      FleetType: "ON_DEMAND"
+      IdleDisconnectTimeoutInSeconds: 900
+      ImageArn: !Sub arn:aws:appstream:${AWS::Region}:${AWS::AccountId}:image/${ImageName}
+      # ImageName: String
+      InstanceType: "stream.standard.medium"
+      MaxUserDurationInSeconds: 960
+      Name: "sample_fleet"
+      Tags:
+        - Key: "key-string"
+          Value: "value-string"
+      VpcConfig:
+        SecurityGroupIds: !Ref SecurityGroupIds
+        SubnetIds: !Ref SubnetIds
