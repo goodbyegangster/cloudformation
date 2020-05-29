@@ -1,0 +1,49 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "AppStream ImageBuilder"
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: "AppStream ImageBuilder"
+        Parameters:
+          - ImageName
+          - SubnetId
+          - SecurityGroupIds
+
+Parameters:
+  ImageName:
+    Type: "String"
+    Default: "AppStream-WinServer2019-04-22-2020"
+  SubnetId:
+    Type: "AWS::EC2::Subnet::Id"
+  SecurityGroupIds:
+    Type: "List<AWS::EC2::SecurityGroup::Id>"
+
+Resources:
+  ImageBuilder:
+    Type: "AWS::AppStream::ImageBuilder"
+    # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-appstream-imagebuilder.html
+    DeletionPolicy: "Delete"
+    Properties:
+      # AccessEndpoints:
+      #   - EndpointType: String
+      #     VpceId: String
+      AppstreamAgentVersion: "LATEST"
+      Description: "Sample Image Builder"
+      DisplayName: "sample_image_builder"
+      # DomainJoinInfo:
+      #   DirectoryName: String
+      #   OrganizationalUnitDistinguishedName: String
+      EnableDefaultInternetAccess: True
+      ImageArn: !Sub arn:aws:appstream:${AWS::Region}::image/${ImageName}
+      # ImageName: String
+      InstanceType: "stream.standard.medium"
+      Name: "sample_image_builder"
+      Tags:
+        - Key: "key-string"
+          Value: "value-string"
+      VpcConfig:
+        SecurityGroupIds: !Ref SecurityGroupIds
+        SubnetIds:
+          - !Ref SubnetId
