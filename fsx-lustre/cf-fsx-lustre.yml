@@ -1,0 +1,75 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "FSx for Lustre"
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: "FSx for Lustre"
+        Parameters:
+          - VpcId
+          - SubnetId
+          - S3BucketName
+          - ImportPrefix
+
+Parameters:
+  VpcId:
+    Type: "AWS::EC2::VPC::Id"
+  SubnetId:
+    Type: "AWS::EC2::Subnet::Id"
+  S3BucketName:
+    Type: "String"
+  ImportPrefix:
+    Type: "String"
+
+Resources:
+  SecurityGroup:
+  # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html
+    Type: "AWS::EC2::SecurityGroup"
+    DeletionPolicy: "Delete"
+    Properties:
+      GroupName: "for-fsx-lustre"
+      GroupDescription: "for-fsx-lustre"
+      # SecurityGroupEgress:
+      #   - Egress
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: "Name"
+          Value: "for-fsx-lustre"
+      VpcId: !Ref VpcId
+  FileSystem:
+  # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-fsx-filesystem.html
+    Type: AWS::FSx::FileSystem
+    DependsOn: "SecurityGroup"
+    DeletionPolicy: "Delete"
+    Properties:
+      # BackupId: String
+      FileSystemType: "LUSTRE"
+      # KmsKeyId: String
+      LustreConfiguration:
+        AutoImportPolicy: "NEW_CHANGED"
+        # AutomaticBackupRetentionDays: Integer
+        # CopyTagsToBackups: Boolean
+        # DailyAutomaticBackupStartTime: String
+        DeploymentType: "SCRATCH_2"
+        # DriveCacheType: String
+        # ExportPath: String
+        # ImportedFileChunkSize: Integer
+        ImportPath: !Sub s3://${S3BucketName}/${ImportPrefix}/
+        # PerUnitStorageThroughput: Integer
+        # WeeklyMaintenanceStartTime: String
+      SecurityGroupIds:
+        - !GetAtt SecurityGroup.GroupId
+      StorageCapacity: 1200
+      # StorageType: String
+      SubnetIds:
+        - !Ref SubnetId
+      Tags:
+        - Key: "Name"
+          Value: "sample"
+      # WindowsConfiguration:
+      #   WindowsConfiguration
