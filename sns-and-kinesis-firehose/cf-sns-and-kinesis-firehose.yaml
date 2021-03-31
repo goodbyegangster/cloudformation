@@ -1,0 +1,260 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CFn for S3, Kinesis Firehose, SNS"
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: "CFn for S3, Kinesis Firehose, SNS"
+        Parameters:
+          - BucketName
+          - Kind
+
+Parameters:
+  BucketName:
+    Type: "String"
+  Kind:
+    Type: "String"
+    AllowedValues:
+    - "bounce"
+    - "complaint"
+    - "delivery"
+
+Resources:
+  S3:
+  # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-s3-bucket.html
+    Type: "AWS::S3::Bucket"
+    DeletionPolicy: "Delete"
+    Properties:
+      # AccelerateConfiguration:
+      #   AccelerateConfiguration
+      # AccessControl: String
+      # AnalyticsConfigurations:
+      #   - AnalyticsConfiguration
+      # BucketEncryption:
+      #   BucketEncryption
+      BucketName: !Ref BucketName
+      # CorsConfiguration:
+      #   CorsConfiguration
+      # IntelligentTieringConfigurations:
+      #   - IntelligentTieringConfiguration
+      # InventoryConfigurations:
+      #   - InventoryConfiguration
+      # LifecycleConfiguration:
+      #   LifecycleConfiguration
+      # LoggingConfiguration:
+      #   LoggingConfiguration
+      # MetricsConfigurations:
+      #   - MetricsConfiguration
+      # NotificationConfiguration:
+      #   NotificationConfiguration
+      # ObjectLockConfiguration:
+      #   ObjectLockConfiguration
+      # ObjectLockEnabled: Boolean
+      # OwnershipControls:
+      #   OwnershipControls
+      # PublicAccessBlockConfiguration:
+      #   PublicAccessBlockConfiguration
+      # ReplicationConfiguration:
+      #   ReplicationConfiguration
+      Tags:
+        - Key: "key"
+          Value: "value"
+      # VersioningConfiguration:
+      #   VersioningConfiguration
+      # WebsiteConfiguration:
+      #   WebsiteConfiguration
+  IAMRoleForKinesis:
+  # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html
+    Type: "AWS::IAM::Role"
+    DependsOn: "S3"
+    DeletionPolicy: "Delete"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service: "firehose.amazonaws.com"
+            Action: "sts:AssumeRole"
+            Condition:
+              StringEquals:
+                sts:ExternalId: !Ref "AWS::AccountId"
+      # Description: String
+      # ManagedPolicyArns:
+      #   - String
+      MaxSessionDuration: 3600
+      # Path: String
+      # PermissionsBoundary: String
+      Policies:
+        -
+          PolicyName: !Sub "policy-s3-access"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action:
+                  - "s3:AbortMultipartUpload"
+                  - "s3:GetBucketLocation"
+                  - "s3:GetObject"
+                  - "s3:ListBucket"
+                  - "s3:ListBucketMultipartUploads"
+                  - "s3:PutObject"
+                Resource:
+                  - !Sub arn:aws:s3:::${BucketName}
+                  - !Sub arn:aws:s3:::${BucketName}/*
+              # -
+              #   Effect: "Allow"
+              #   Action:
+              #     - "kinesis:DescribeStream"
+              #     - "kinesis:GetShardIterator"
+              #     - "kinesis:GetRecords"
+              #     - "kinesis:ListShards"
+              #   Resource: !Sub arn:aws:kinesis:${AWS::Region}:${AWS::AccountId}:stream/stream-name
+              # -
+              #   Effect: "Allow"
+              #   Action:
+              #     - "kms:Decrypt"
+              #     - "kms:GenerateDataKey"
+              #   Resource: !Sub arn:aws:kms:${AWS::Region}:${AWS::AccountId}:key/key-id
+              #   Condition:
+              #     StringEquals:
+              #       kms:ViaService: "s3.region.amazonaws.com"
+              #     StringLike:
+              #       kms:EncryptionContext:aws:s3:arn: "arn:aws:s3:::bucket-name/prefix*"
+              # - 
+              #   Effect: "Allow"
+              #   Action: "logs:PutLogEvents"
+              #   Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}::log-group:log-group-name:log-stream:log-stream-name
+              # - 
+              #   Effect: "Allow"
+              #   Action:
+              #     - "lambda:InvokeFunction"
+              #     - "lambda:GetFunctionConfiguration"
+              #   Resource: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:function-name:function-version
+      RoleName: !Sub kinesis-for-ses_notification_${Kind}
+      Tags:
+        - Key: "key"
+          Value: "value"
+  KinesisFirehose:
+  # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-kinesisfirehose-deliverystream.html
+    Type: "AWS::KinesisFirehose::DeliveryStream"
+    DependsOn: "IAMRoleForKinesis"
+    DeletionPolicy: "Delete"
+    Properties:
+      # DeliveryStreamEncryptionConfigurationInput:
+      #   DeliveryStreamEncryptionConfigurationInput
+      DeliveryStreamName: !Sub ses_notification_stream-${Kind}
+      DeliveryStreamType: "DirectPut"
+      # ElasticsearchDestinationConfiguration:
+      #   ElasticsearchDestinationConfiguration
+      # ExtendedS3DestinationConfiguration:
+      #   ExtendedS3DestinationConfiguration
+      # HttpEndpointDestinationConfiguration:
+      #   HttpEndpointDestinationConfiguration
+      # KinesisStreamSourceConfiguration:
+      #   KinesisStreamSourceConfiguration
+      # RedshiftDestinationConfiguration:
+      #   RedshiftDestinationConfiguration
+      S3DestinationConfiguration:
+        BucketARN: !GetAtt S3.Arn
+        BufferingHints:
+          IntervalInSeconds: 300
+          SizeInMBs: 5
+        # CloudWatchLoggingOptions:
+          # CloudWatchLoggingOptions
+        CompressionFormat: "UNCOMPRESSED"
+        # EncryptionConfiguration:
+        #   EncryptionConfiguration
+        ErrorOutputPrefix: !Sub error/${Kind}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/!{firehose:error-output-type}/
+        Prefix: !Sub ${Kind}/!{timestamp:yyyy}/!{timestamp:MM}/!{timestamp:dd}/!{timestamp:HH}/
+        RoleARN: !GetAtt IAMRoleForKinesis.Arn
+      # SplunkDestinationConfiguration:
+      #   SplunkDestinationConfiguration
+      Tags:
+        - Key: "key"
+          Value: "value"
+  IAMRoleForSNS:
+  # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html
+    Type: "AWS::IAM::Role"
+    DependsOn: "KinesisFirehose"
+    DeletionPolicy: "Delete"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service: "sns.amazonaws.com"
+            Action: "sts:AssumeRole"
+      # Description: String
+      # ManagedPolicyArns:
+      #   - String
+      MaxSessionDuration: 3600
+      # Path: String
+      # PermissionsBoundary: String
+      Policies:
+        -
+          PolicyName: "policy-kinesis-firehose"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action:
+                  - "firehose:DescribeDeliveryStream"
+                  - "firehose:ListTagsForDeliveryStream"
+                  - "firehose:PutRecord"
+                  - "firehose:PutRecordBatch"
+                Resource: !Sub arn:aws:firehose:${AWS::Region}:${AWS::AccountId}:deliverystream/ses_notification_stream-${Kind}
+              -
+                Effect: "Allow"
+                Action:
+                  - "firehose:ListDeliveryStreams"
+                Resource: "*"
+      RoleName: !Sub sns-for-ses_stream-${Kind}
+      Tags:
+        - Key: "key"
+          Value: "value"
+  SNSTopic:
+  # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-sns-topic.html
+    Type: "AWS::SNS::Topic"
+    DependsOn: "IAMRoleForSNS"
+    DeletionPolicy: "Delete"
+    Properties:
+      # ContentBasedDeduplication: Boolean
+      DisplayName: !Sub ses_notifications_${Kind}
+      FifoTopic: false
+      # KmsMasterKeyId: String
+      # Subscription:
+      #   - Endpoint: !GetAtt KinesisFirehose.Arn
+      #     Protocol: "firehose"
+      # Subscription:
+      #     - Subscription
+      Tags:
+        - Key: "key"
+          Value: "value"
+      TopicName: !Sub ses_notifications_${Kind}
+  SNSSubscription:
+  # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-sns-subscription.html
+    Type: "AWS::SNS::Subscription"
+    DependsOn: "KinesisFirehose"
+    DeletionPolicy: "Delete"
+    Properties: 
+      # DeliveryPolicy: Json
+      Endpoint: !Sub arn:aws:firehose:${AWS::Region}:${AWS::AccountId}:deliverystream/ses_notification_stream-${Kind}
+      # FilterPolicy: Json
+      Protocol: "firehose"
+      RawMessageDelivery: True
+      # RedrivePolicy: Json
+      # Region: String
+      SubscriptionRoleArn: !Sub arn:aws:iam::${AWS::AccountId}:role/sns-for-ses_stream-${Kind}
+      TopicArn: !Ref SNSTopic
+
+Outputs:
+  SNSTopicArn:
+    Description: "the Arn of SNS Topic"
+    Value: !Ref SNSTopic
